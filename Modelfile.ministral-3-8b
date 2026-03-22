@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.ministral-3-8b — Ministral 3 8B with 16k context
+#
+# Good fit for an 8 GB CPU-only host.
+# Create with:
+#   podman exec -it ollama ollama create ministral-3-8b-16k \
+#       -f /path/to/Modelfile.ministral-3-8b
+# Or copy into container:
+#   podman cp Modelfile.ministral-3-8b ollama:/tmp/
+#   podman exec -it ollama ollama create ministral-3-8b-16k \
+#       -f /tmp/Modelfile.ministral-3-8b
+# =============================================================================
+
+FROM ministral-3:8b
+
+# 16k is the practical ceiling for an 8 GB host with this model.
+# Ollama default is 4096 — too small for OpenCode tool use.
+PARAMETER num_ctx 16384
+
+# Low temperature for deterministic code generation
+PARAMETER temperature 0.15

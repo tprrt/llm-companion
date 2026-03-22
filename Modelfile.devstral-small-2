@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.devstral-small-2 — Devstral Small 2 (24B) with 32k context
+#
+# TARGET: GPU host (AMD Radeon with ≥ 16 GB VRAM) or RAM host with ≥ 24 GB.
+# This model WILL NOT fit on an 8 GB RAM CPU-only host.
+#
+# Memory guide (Q4_K_M, ≈ 15 GB base):
+#   16k ctx → ~17 GB total  → needs 20 GB VRAM or 24 GB RAM
+#   32k ctx → ~19 GB total  → needs 24 GB VRAM or 32 GB RAM
+#   57k ctx → ~24 GB total  → fits a single RX 7900 XTX (24 GB)
+#
+# Create with:
+#   podman cp Modelfile.devstral-small-2 ollama:/tmp/
+#   podman exec -it ollama ollama create devstral-small-2-32k \
+#       -f /tmp/Modelfile.devstral-small-2
+# =============================================================================
+
+FROM devstral-small-2:24b
+
+# 32k is a good default for agentic use (whole files + tool context).
+# Drop to 16384 if you hit OOM on your GPU; raise to 57344 on a 24 GB card.
+PARAMETER num_ctx 32768
+
+# Devstral works best at low temperature for code tasks
+PARAMETER temperature 0.15

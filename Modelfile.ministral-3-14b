@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.ministral-3-14b — Ministral-3 14B with 16k context
+#
+# Higher-quality Ministral for the AMD GPU host.
+# Complement to Devstral: use this for general Q&A, vision tasks, and
+# documentation; use devstral-small-2 for deep agentic coding sessions.
+#
+# Memory guide (Q4_K_M, ≈ 9 GB base):
+#   16k ctx → ~11 GB total → needs 12 GB VRAM (RX 6700 XT and above)
+#   32k ctx → ~13 GB total → needs 16 GB VRAM
+#
+# Create with:
+#   podman cp Modelfile.ministral-3-14b ollama:/tmp/
+#   podman exec -it ollama ollama create ministral-3-14b-16k \
+#       -f /tmp/Modelfile.ministral-3-14b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM ministral-3:14b
+
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.15

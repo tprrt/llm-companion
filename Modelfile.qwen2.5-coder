@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile — create a model variant with a larger context window
+#
+# Required for OpenCode tool use to work reliably.
+# Ollama defaults to 4096 tokens even when the model supports more.
+#
+# Usage (from inside the container, or with OLLAMA_HOST pointed at the server):
+#   ollama create qwen2.5-coder:7b-16k -f Modelfile.qwen2.5-coder
+#   # Then reference it in opencode.json as: ollama/qwen2.5-coder:7b-16k
+#
+# Or interactively:
+#   podman exec -it ollama ollama run qwen2.5-coder:7b
+#   >>> /set parameter num_ctx 16384
+#   >>> /save qwen2.5-coder:7b-16k
+#   >>> /bye
+# =============================================================================
+
+FROM qwen2.5-coder:7b
+
+# Context window — 16k is the minimum for reliable OpenCode tool use.
+# Increase to 32768 if your RAM comfortably fits (needs ~14GB for 7B + 32k ctx).
+PARAMETER num_ctx 16384
+
+# Reduce verbosity for agentic use (no need for the model to "think aloud").
+PARAMETER temperature 0.2
