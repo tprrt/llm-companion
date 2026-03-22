@@ -1,6 +1,14 @@
 .. SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
 .. SPDX-License-Identifier: CC-BY-SA-4.0
 
+.. image:: https://circleci.com/gh/tprrt/llm-companion.svg?style=svg
+    :alt: Circle badge
+    :target: https://app.circleci.com/pipelines/github/tprrt/llm-companion
+
+.. image:: https://sonarcloud.io/api/project_badges/measure?project=tprrt_llm-companion&metric=alert_status
+    :alt: Quality Gate Status
+    :target: https://sonarcloud.io/dashboard?id=tprrt_llm-companion
+
 llm-companion — Podman Kubernetes Pod stack for Fedora Server
 =============================================================
 
