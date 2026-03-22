@@ -8,6 +8,7 @@
 #   validate-changes — all branches except gh-pages: lint + validate jobs
 #
 # Jobs:
+#   sonarcloud-scan   — static analysis with SonarCloud
 #   shellcheck        — lint shell scripts with ShellCheck
 #   hadolint          — lint Dockerfile with Hadolint
 #   caddy-validate    — check Caddyfile formatting and syntax
@@ -17,6 +18,9 @@
 # =============================================================================
 
 version: 2.1
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@2.0.0
 
 # ---------------------------------------------------------------------------
 # Shared filter — run on all branches except gh-pages
@@ -44,8 +48,21 @@ executors:
     docker:
       - image: alpine:3.21
     resource_class: small
+  docker-sonarcloud:
+    docker:
+      - image: cimg/node:20.8.1
+    resource_class: medium
 
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # sonarcloud-scan — static analysis with SonarCloud
+  # ---------------------------------------------------------------------------
+  sonarcloud-scan:
+    executor: docker-sonarcloud
+    steps:
+      - checkout
+      - sonarcloud/scan
 
   # ---------------------------------------------------------------------------
   # shellcheck — static analysis for all Bash scripts
@@ -149,7 +166,7 @@ jobs:
             rc=0
             for f in \
               *.sh Dockerfile Caddyfile *.container *.network Modelfile.* \
-              *.yml *.kube \
+              *.yml *.kube *.properties \
               ansible/**/*.yml; do
               [ -f "$f" ] || continue
               if ! grep -q "SPDX-License-Identifier:" "$f"; then
@@ -166,6 +183,10 @@ workflows:
   # ---------------------------------------------------------------------------
   validate-changes:
     jobs:
+      - sonarcloud-scan:
+          context:
+            - sonarcloud.io
+          <<: *ignore-gh-pages
       - shellcheck:
           <<: *ignore-gh-pages
       - hadolint:
