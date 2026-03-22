@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# ── Stack settings ────────────────────────────────────────────────────────────
+# Host port exposed by Caddy (must match stack.yml hostPort and firewall rule)
+llm_web_port: 8080
+
+# Directory containing the llm-companion project files on the TARGET host.
+# Ansible copies stack.yml from here. The Dockerfile must also be here.
+llm_project_dir: "{{ ansible_user_dir }}/llm-companion"
+
+# ── Ollama build ──────────────────────────────────────────────────────────────
+# Build target: 'cpu' or 'rocm'
+ollama_build_target: cpu
+# Image tag after build
+ollama_image_tag: "ollama-{{ ollama_build_target }}:latest"
