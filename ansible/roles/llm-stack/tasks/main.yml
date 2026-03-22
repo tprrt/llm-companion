@@ -1,0 +1,158 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# ── Copy stack manifest ───────────────────────────────────────────────────────
+# For ROCm builds, stack-rocm.yml is used as the source (it references
+# localhost/ollama-rocm:latest and enables privileged GPU access).
+# The destination is always stack.yml so the Quadlet unit needs no change.
+- name: Copy stack manifest to ~/.config/containers/systemd/
+  ansible.builtin.copy:
+    src: "{{ llm_project_dir }}/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
+    dest: "{{ ansible_user_dir }}/.config/containers/systemd/stack.yml"
+    remote_src: true
+    mode: "0644"
+
+# ── Generate Ollama API key ───────────────────────────────────────────────────
+- name: Check if Ollama API key file exists
+  ansible.builtin.stat:
+    path: "{{ ansible_user_dir }}/.config/ollama/api-key.env"
+  register: api_key_file
+
+- name: Generate Ollama API key
+  when: not api_key_file.stat.exists
+  block:
+    - name: Generate random hex key
+      ansible.builtin.command:
+        cmd: openssl rand -hex 24
+      register: api_key_raw
+      changed_when: false
+
+    - name: Write API key to file
+      ansible.builtin.copy:
+        content: "OLLAMA_API_KEY=sk-ollama-{{ api_key_raw.stdout }}\n"
+        dest: "{{ ansible_user_dir }}/.config/ollama/api-key.env"
+        mode: "0600"
+
+# ── Generate WebUI secret key ─────────────────────────────────────────────────
+- name: Check if WebUI secret key file exists
+  ansible.builtin.stat:
+    path: "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
+  register: webui_secret_file
+
+- name: Generate WebUI secret key
+  when: not webui_secret_file.stat.exists
+  block:
+    - name: Generate random hex secret
+      ansible.builtin.command:
+        cmd: openssl rand -hex 32
+      register: webui_secret_raw
+      changed_when: false
+
+    - name: Write WebUI secret to file
+      ansible.builtin.copy:
+        content: "WEBUI_SECRET_KEY={{ webui_secret_raw.stdout }}\n"
+        dest: "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
+        mode: "0600"
+
+# ── Read secrets from files ───────────────────────────────────────────────────
+- name: Read Ollama API key
+  ansible.builtin.command:
+    cmd: grep OLLAMA_API_KEY {{ ansible_user_dir }}/.config/ollama/api-key.env
+  register: api_key_line
+  changed_when: false
+
+- name: Parse Ollama API key value
+  ansible.builtin.set_fact:
+    llm_api_key: "{{ api_key_line.stdout | regex_replace('^OLLAMA_API_KEY=', '') }}"
+
+- name: Read WebUI secret key
+  ansible.builtin.command:
+    cmd: grep WEBUI_SECRET_KEY {{ ansible_user_dir }}/.config/ollama/webui-secret.env
+  register: webui_secret_line
+  changed_when: false
+
+- name: Parse WebUI secret key value
+  ansible.builtin.set_fact:
+    llm_webui_secret: "{{ webui_secret_line.stdout | regex_replace('^WEBUI_SECRET_KEY=', '') }}"
+
+# ── Render and place secrets YAML ─────────────────────────────────────────────
+- name: Render secrets YAML from template
+  ansible.builtin.template:
+    src: secrets.yml.j2
+    dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion-secrets.yml"
+    mode: "0600"
+
+# ── Apply secrets to Podman ───────────────────────────────────────────────────
+- name: Apply secrets YAML to Podman
+  ansible.builtin.command:
+    cmd: >
+      podman play kube
+      {{ ansible_user_dir }}/.config/containers/systemd/llm-companion-secrets.yml
+      --replace
+  register: secrets_apply_result
+  changed_when: "'Created' in secrets_apply_result.stdout or secrets_apply_result.rc == 0"
+
+# ── Fedora / RedHat: Quadlet .kube unit ──────────────────────────────────────
+- name: Copy llm-companion.kube Quadlet unit (RedHat)
+  ansible.builtin.copy:
+    src: "{{ llm_project_dir }}/llm-companion.kube"
+    dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion.kube"
+    remote_src: true
+    mode: "0644"
+  when: ansible_os_family == "RedHat"
+
+- name: Reload systemd user daemon (RedHat)
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+  when: ansible_os_family == "RedHat"
+
+- name: Enable and start llm-companion Quadlet service (RedHat)
+  ansible.builtin.systemd:
+    name: llm-companion
+    scope: user
+    state: started
+    enabled: true
+  when: ansible_os_family == "RedHat"
+
+# ── Debian: plain systemd user service ───────────────────────────────────────
+- name: Create ~/.config/systemd/user directory (Debian)
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.config/systemd/user"
+    state: directory
+    mode: "0755"
+  when: ansible_os_family == "Debian"
+
+- name: Write llm-companion systemd user service (Debian)
+  ansible.builtin.copy:
+    dest: "{{ ansible_user_dir }}/.config/systemd/user/llm-companion.service"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=llm-companion stack
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --replace
+      ExecStop=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --down
+
+      [Install]
+      WantedBy=default.target
+  when: ansible_os_family == "Debian"
+
+- name: Reload systemd user daemon (Debian)
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start llm-companion service (Debian)
+  ansible.builtin.systemd:
+    name: llm-companion
+    scope: user
+    state: started
+    enabled: true
+  when: ansible_os_family == "Debian"

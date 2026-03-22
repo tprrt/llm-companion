@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+- name: Deploy llm-companion stack
+  # 'all' works for both remote deployment (inventory groups) and local
+  # self-provisioning (ansible-playbook -c local -i "localhost,").
+  # To target only a subset: ansible-playbook ... --limit llm_companion
+  hosts: all
+  gather_facts: true
+  roles:
+    - common
+    - firewall
+    - podman
+    - llm-stack

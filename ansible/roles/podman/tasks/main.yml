@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# ── Install Podman and build tools ───────────────────────────────────────────
+- name: Install Podman, buildah, and networking tools (RedHat)
+  ansible.builtin.dnf:
+    name:
+      - podman
+      - buildah
+      - passt
+      - slirp4netns
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Install Podman and buildah (Debian)
+  ansible.builtin.apt:
+    name:
+      - podman
+      - buildah
+    state: present
+    update_cache: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+# ── SELinux boolean (RedHat only) ─────────────────────────────────────────────
+- name: Enable SELinux boolean container_manage_cgroup (RedHat)
+  ansible.builtin.command:
+    cmd: setsebool -P container_manage_cgroup on
+  become: true
+  when: ansible_os_family == "RedHat"
+  changed_when: true
+
+# ── Podman user socket ────────────────────────────────────────────────────────
+- name: Enable Podman user socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    scope: user
+    state: started
+    enabled: true
+
+# ── Build Ollama image ────────────────────────────────────────────────────────
+- name: Check if Ollama image already exists
+  ansible.builtin.command:
+    cmd: podman image exists {{ ollama_image_tag }}
+  register: podman_ollama_image_check
+  failed_when: false
+  changed_when: false
+
+- name: Build Ollama image from project directory
+  ansible.builtin.command:
+    cmd: podman build --target {{ ollama_build_target }} -t {{ ollama_image_tag }} {{ llm_project_dir }}
+  register: podman_ollama_build_result
+  changed_when: podman_ollama_build_result.rc == 0
+  when: podman_ollama_image_check.rc != 0

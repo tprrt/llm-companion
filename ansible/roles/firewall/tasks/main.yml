@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# ── RedHat (Fedora, RHEL, CentOS) — firewalld ────────────────────────────────
+- name: Install firewalld (RedHat)
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Ensure firewalld is running (RedHat)
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: true
+  become: true
+  when: ansible_os_family == "RedHat"
+
+- name: Open web port in firewalld (RedHat)
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --zone=public --add-port={{ llm_web_port }}/tcp
+  become: true
+  when: ansible_os_family == "RedHat"
+  register: firewall_add_port
+  # firewall-cmd prints "ALREADY_ENABLED" when the rule already exists.
+  changed_when: "'ALREADY_ENABLED' not in firewall_add_port.stdout"
+
+- name: Reload firewalld to apply new rules (RedHat)
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  become: true
+  when: ansible_os_family == "RedHat" and firewall_add_port.changed
+  changed_when: firewall_add_port.changed
+
+# ── Debian (Debian, Ubuntu) — ufw ────────────────────────────────────────────
+- name: Install ufw (Debian)
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Allow web port through ufw (Debian)
+  ansible.builtin.command:
+    cmd: ufw allow {{ llm_web_port }}/tcp
+  become: true
+  when: ansible_os_family == "Debian"
+  changed_when: true
+
+- name: Enable ufw (Debian)
+  ansible.builtin.command:
+    cmd: ufw --force enable
+  become: true
+  when: ansible_os_family == "Debian"
+  changed_when: true

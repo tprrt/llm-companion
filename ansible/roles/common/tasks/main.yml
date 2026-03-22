@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+- name: Create ~/.config/containers/systemd directory
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.config/containers/systemd"
+    state: directory
+    mode: "0755"
+
+- name: Create ~/.config/ollama directory
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.config/ollama"
+    state: directory
+    mode: "0700"
+
+- name: Create model storage directory ~/ollama-models
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/ollama-models"
+    state: directory
+    mode: "0755"
+
+- name: Set SELinux label on ollama-models directory (RedHat only)
+  ansible.builtin.command:
+    cmd: chcon -Rt container_file_t "{{ ansible_user_dir }}/ollama-models"
+  when: ansible_os_family == "RedHat"
+  changed_when: true
+
+- name: Enable loginctl linger for the connecting user
+  ansible.builtin.command:
+    cmd: loginctl enable-linger {{ ansible_user_id }}
+  become: true
+  changed_when: true
+
+- name: Check if subuid entry already exists for the user
+  ansible.builtin.command:
+    cmd: grep -q "^{{ ansible_user_id }}:" /etc/subuid
+  register: common_subuid_check
+  failed_when: false
+  changed_when: false
+
+- name: Add subuid/subgid entries for rootless Podman
+  ansible.builtin.command:
+    cmd: usermod --add-subuids 100000-165535 --add-subgids 100000-165535 {{ ansible_user_id }}
+  become: true
+  when: common_subuid_check.rc != 0
+  changed_when: true
