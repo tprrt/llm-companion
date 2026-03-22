@@ -1,0 +1,291 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# stack-rocm.yml — AMD ROCm GPU variant of the llm-companion stack
+#
+# This file is identical to stack.yml except for the Ollama container:
+#   - Uses the ollama-rocm image (built with ROCm support)
+#   - OLLAMA_CONTEXT_LENGTH increased to 32768 (enough for Devstral-Small-2)
+#   - ROCR_VISIBLE_DEVICES=all to expose all ROCm-capable GPUs
+#   - securityContext.privileged=true (required for /dev/kfd and /dev/dri
+#     access in rootless Podman; see note below)
+#
+# For k3s Phase 2:
+#   Replace privileged: true with the AMD GPU device plugin resource request:
+#     resources:
+#       limits:
+#         amd.com/gpu: "1"
+#   And ensure the amd-gpu-operator or device plugin DaemonSet is installed.
+#
+# Usage:
+#   podman play kube ~/.config/containers/systemd/llm-companion-secrets.yml
+#   podman play kube ~/.config/containers/systemd/stack-rocm.yml --replace
+#
+# Prerequisites on the host:
+#   sudo usermod -aG render,video $USER   # logout/login required after
+#   sudo dnf install rocm-hip rocm-opencl rocm-smi
+#   rocminfo | grep gfx   # note your gfx version
+# =============================================================================
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llm-ollama-models
+  labels:
+    app: llm-companion
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llm-open-webui-data
+  labels:
+    app: llm-companion
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llm-caddy-data
+  labels:
+    app: llm-companion
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# ConfigMap with embedded Caddyfile.
+# Identical to the one in stack.yml — all addresses use localhost.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-companion-config
+  labels:
+    app: llm-companion
+data:
+  Caddyfile: |
+    {
+      # Disable the admin API — not needed for this setup.
+      admin off
+
+      # Disable HTTPS redirection — we're on an internal network.
+      # Remove this block if you enable TLS below.
+      auto_https off
+    }
+
+    :8080 {
+      # ── TLS (disabled by default) ──────────────────────────────────────
+      # Uncomment to enable a self-signed cert (trustable on LAN/VPN):
+      # tls internal
+      # Uncomment for ACME/Let's Encrypt with a public domain:
+      # tls your@email.com
+
+      # ── Ollama API — Bearer token protected ────────────────────────────
+      # Prefixed with /ollama/ to avoid conflicting with Open WebUI's own /api/.
+      # Clients: use http://<host>:8080/ollama/api/ and /ollama/v1/
+      @ollama_api {
+        path /ollama/api/* /ollama/v1/*
+      }
+
+      handle @ollama_api {
+        # Reject requests without the correct Bearer token.
+        @unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
+        respond @unauthorized "Unauthorized" 401
+
+        # Strip the /ollama prefix before forwarding to Ollama.
+        uri strip_prefix /ollama
+
+        # Forward authenticated requests to Ollama (localhost — shared pod network).
+        reverse_proxy localhost:11434 {
+          # Pass the client's real IP for logging.
+          header_up X-Real-IP {remote_host}
+          # Strip the Authorization header before forwarding — Ollama
+          # doesn't need it and we don't want it in logs.
+          header_up -Authorization
+        }
+      }
+
+      # ── Open WebUI — no extra auth (has its own account system) ────────
+      # Open WebUI runs on port 3000 (not 8080) to avoid conflicting with Caddy.
+      handle {
+        reverse_proxy localhost:3000 {
+          header_up X-Real-IP {remote_host}
+        }
+      }
+
+      # ── Logging ────────────────────────────────────────────────────────
+      log {
+        output stderr
+        format console
+        level INFO
+      }
+    }
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: llm-companion
+  labels:
+    app: llm-companion
+  annotations:
+    # Podman rootless extension: map the container user to the host user.
+    # This is equivalent to --userns=keep-id in podman run.
+    io.podman.annotations.userns: "keep-id"
+spec:
+  restartPolicy: Always
+
+  containers:
+    # ── Ollama (ROCm GPU variant) ─────────────────────────────────────────────
+    - name: ollama
+      image: localhost/ollama-rocm:latest
+      env:
+        # Listen on all interfaces within the pod network namespace.
+        - name: OLLAMA_HOST
+          value: "0.0.0.0:11434"
+        # Larger context window for Devstral-Small-2 (24B model).
+        - name: OLLAMA_CONTEXT_LENGTH
+          value: "32768"
+        - name: OLLAMA_KEEP_ALIVE
+          value: "10m"
+        - name: OLLAMA_MAX_LOADED_MODELS
+          value: "1"
+        # Pod mode: containers communicate via localhost, not DNS names.
+        - name: OLLAMA_ORIGINS
+          value: "http://localhost:8080"
+        - name: ANONYMIZED_TELEMETRY
+          value: "false"
+        # Expose all ROCm-capable GPUs to Ollama.
+        - name: ROCR_VISIBLE_DEVICES
+          value: "all"
+        # Uncomment and set if your GPU needs a GFX version override.
+        # Find your version with: rocminfo | grep gfx
+        # Common values: gfx1010 (RX 5700), gfx1030 (RX 6800), gfx1100 (RX 7900)
+        # - name: HSA_OVERRIDE_GFX_VERSION
+        #   value: "11.0.0"
+      livenessProbe:
+        exec:
+          command:
+            - ollama
+            - list
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        timeoutSeconds: 10
+      securityContext:
+        # privileged: true is required for rootless Podman to access /dev/kfd
+        # and /dev/dri (AMD GPU devices). Without this, ROCm cannot enumerate
+        # the GPU and Ollama falls back to CPU inference.
+        #
+        # For k3s Phase 2: replace this with the AMD GPU device plugin:
+        #   resources:
+        #     limits:
+        #       amd.com/gpu: "1"
+        # and remove privileged: true.
+        privileged: true
+      volumeMounts:
+        - name: ollama-models
+          mountPath: /var/lib/ollama/models
+
+    # ── Open WebUI ───────────────────────────────────────────────────────────
+    - name: open-webui
+      image: ghcr.io/open-webui/open-webui:latest
+      env:
+        # Open WebUI binds on port 3000 (not 8080) to avoid conflicting with Caddy.
+        - name: PORT
+          value: "3000"
+        # Pod mode: Ollama is reachable on localhost within the shared network namespace.
+        - name: OLLAMA_BASE_URL
+          value: "http://localhost:11434"
+        - name: ANONYMIZED_TELEMETRY
+          value: "false"
+        - name: ENABLE_SIGNUP
+          value: "true"
+        # Secret key for session signing — read from the Kubernetes Secret.
+        - name: WEBUI_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-companion-secrets
+              key: webui-secret-key
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 10
+      volumeMounts:
+        - name: open-webui-data
+          mountPath: /app/backend/data
+
+    # ── Caddy ────────────────────────────────────────────────────────────────
+    - name: caddy
+      image: docker.io/library/caddy:latest
+      env:
+        # API key for Ollama Bearer token auth — read from the Kubernetes Secret.
+        - name: OLLAMA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-companion-secrets
+              key: ollama-api-key
+      ports:
+        # Publish Caddy's port to the host.
+        - containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
+      livenessProbe:
+        exec:
+          command:
+            - caddy
+            - validate
+            - --config
+            - /etc/caddy/Caddyfile
+        initialDelaySeconds: 5
+        periodSeconds: 30
+        timeoutSeconds: 10
+      # NOTE: No cap-drop: ALL for Caddy.
+      # Caddy has cap_net_bind_service as a file capability in the image.
+      # Dropping ALL capabilities in a rootless user namespace causes EPERM
+      # when Caddy tries to bind privileged ports (even :8080 on some kernels).
+      # The securityContext block is intentionally omitted here.
+      volumeMounts:
+        - name: caddyfile
+          mountPath: /etc/caddy/Caddyfile
+          subPath: Caddyfile
+          readOnly: true
+        - name: caddy-data
+          mountPath: /data
+
+  volumes:
+    - name: ollama-models
+      persistentVolumeClaim:
+        claimName: llm-ollama-models
+    - name: open-webui-data
+      persistentVolumeClaim:
+        claimName: llm-open-webui-data
+    - name: caddy-data
+      persistentVolumeClaim:
+        claimName: llm-caddy-data
+    # ConfigMap volume: mounts the embedded Caddyfile into the Caddy container.
+    - name: caddyfile
+      configMap:
+        name: llm-companion-config
+        items:
+          - key: Caddyfile
+            path: Caddyfile

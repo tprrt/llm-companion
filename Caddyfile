@@ -1,0 +1,97 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Caddyfile — Reverse proxy for the Ollama stack
+#
+# NOTE: This file is the canonical reference copy kept in the repository.
+#       The actual running configuration is embedded as a ConfigMap in
+#       stack.yml. After editing this file, update the ConfigMap in stack.yml
+#       to match, then apply: podman play kube stack.yml --replace
+#
+# Binds on :8080 (unprivileged, rootless-safe).
+# Exposes two routes on the same port:
+#
+#   /              → Open WebUI (browser chat interface, has its own /api/)
+#   /ollama/api/*  → Ollama API (for OpenCode and other API clients)
+#   /ollama/v1/*   → Ollama OpenAI-compat endpoint (for OpenCode)
+#
+# Pod mode (single pod — shared network namespace):
+#   All containers communicate via localhost, not DNS names.
+#   Ollama listens on localhost:11434
+#   Open WebUI listens on localhost:3000 (not 8080 — Caddy owns :8080)
+#
+# Authentication:
+#   ALL /api/* and /v1/* requests must carry:
+#     Authorization: Bearer <your-api-key>
+#   The key is read from the OLLAMA_API_KEY environment variable — never
+#   hardcoded in this file. See generate-api-key.sh to create one.
+#
+#   Open WebUI (/) is NOT key-protected here — Open WebUI has its own
+#   account system. Adjust the @webui block if you want to restrict it.
+#
+# TLS:
+#   By default, TLS is OFF (plain HTTP on the internal network / VPN).
+#   To enable TLS with a self-signed cert (good for LAN + VPN):
+#     - Uncomment the tls section below
+#     - Change the hostPort in stack.yml to 8443 (optional)
+#     - Add the cert to your client trust store
+#   For a real domain: replace tls internal with tls your@email.com
+#   and ensure port 443 is forwarded.
+# =============================================================================
+{
+	# Disable the admin API — not needed for this setup.
+	admin off
+
+	# Disable HTTPS redirection — we're on an internal network.
+	# Remove this block if you enable TLS below.
+	auto_https off
+}
+
+:8080 {
+	# ── TLS (disabled by default) ────────────────────────────────────────
+	# Uncomment to enable a self-signed cert (trustable on LAN/VPN):
+	# tls internal
+	# Uncomment for ACME/Let's Encrypt with a public domain:
+	# tls your@email.com
+
+	# ── Ollama API — Bearer token protected ──────────────────────────────
+	# Prefixed with /ollama/ to avoid conflicting with Open WebUI's own /api/.
+	# Clients: use http://<host>:8080/ollama/api/ and /ollama/v1/
+	@ollama_api {
+		path /ollama/api/* /ollama/v1/*
+	}
+
+	handle @ollama_api {
+		# Reject requests without the correct Bearer token.
+		@unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
+		respond @unauthorized "Unauthorized" 401
+
+		# Strip the /ollama prefix before forwarding to Ollama.
+		uri strip_prefix /ollama
+
+		# Forward authenticated requests to Ollama (localhost — shared pod network).
+		reverse_proxy localhost:11434 {
+			# Pass the client's real IP for logging.
+			header_up X-Real-IP {remote_host}
+			# Strip the Authorization header before forwarding — Ollama
+			# doesn't need it and we don't want it in logs.
+			header_up -Authorization
+		}
+	}
+
+	# ── Open WebUI — no extra auth (has its own account system) ──────────
+	# Open WebUI listens on port 3000 (not 8080) to avoid conflicting with Caddy.
+	handle {
+		reverse_proxy localhost:3000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ── Logging ──────────────────────────────────────────────────────────
+	log {
+		output stderr
+		format console
+		level INFO
+	}
+}
