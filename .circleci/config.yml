@@ -1,0 +1,180 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# CircleCI pipeline — static validation for the llm-companion stack
+#
+# Workflow:
+#   validate-changes — all branches except gh-pages: lint + validate jobs
+#
+# Jobs:
+#   shellcheck        — lint shell scripts with ShellCheck
+#   hadolint          — lint Dockerfile with Hadolint
+#   caddy-validate    — check Caddyfile formatting and syntax
+#   ansible-lint      — lint Ansible playbooks
+#   kube-validate     — validate Kubernetes YAML (stack.yml, stack-rocm.yml, llm-companion.kube)
+#   check-spdx        — verify every source file carries an SPDX header
+# =============================================================================
+
+version: 2.1
+
+# ---------------------------------------------------------------------------
+# Shared filter — run on all branches except gh-pages
+# ---------------------------------------------------------------------------
+x-ignore-gh-pages: &ignore-gh-pages
+  filters:
+    branches:
+      ignore:
+        - gh-pages
+
+executors:
+  docker-shellcheck:
+    docker:
+      - image: koalaman/shellcheck-alpine:stable
+    resource_class: small
+  docker-hadolint:
+    docker:
+      - image: hadolint/hadolint:v2.12.0-alpine
+    resource_class: small
+  docker-caddy:
+    docker:
+      - image: caddy:2.9-alpine
+    resource_class: small
+  docker-alpine:
+    docker:
+      - image: alpine:3.21
+    resource_class: small
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # shellcheck — static analysis for all Bash scripts
+  # ---------------------------------------------------------------------------
+  shellcheck:
+    executor: docker-shellcheck
+    steps:
+      - checkout
+      - run:
+          name: Lint shell scripts
+          command: find . -name "*.sh" -not -path "./.git/*" | xargs shellcheck
+
+  # ---------------------------------------------------------------------------
+  # hadolint — Dockerfile best-practice linter
+  #
+  # DL3007 (avoid :latest) is ignored because the comments already document
+  # that pinning to a specific version is the operator's responsibility.
+  # ---------------------------------------------------------------------------
+  hadolint:
+    executor: docker-hadolint
+    steps:
+      - checkout
+      - run:
+          name: Lint Dockerfile
+          command: hadolint --ignore DL3007 Dockerfile
+
+  # ---------------------------------------------------------------------------
+  # caddy-validate — formatting and syntax check for the Caddyfile
+  #
+  # caddy fmt exits 1 if the file is not already formatted.
+  # Fix locally with: caddy fmt --overwrite Caddyfile
+  # OLLAMA_API_KEY is set to a placeholder so {$OLLAMA_API_KEY} resolves
+  # during syntax validation without a real secret.
+  # ---------------------------------------------------------------------------
+  caddy-validate:
+    executor: docker-caddy
+    steps:
+      - checkout
+      - run:
+          name: Check Caddyfile formatting
+          # Snapshot the original, format in-place, diff against the snapshot.
+          # Fix locally with: caddy fmt --overwrite Caddyfile
+          command: |
+            cp Caddyfile /tmp/Caddyfile.orig
+            caddy fmt --overwrite Caddyfile
+            if ! diff -u /tmp/Caddyfile.orig Caddyfile; then
+              echo "Caddyfile was not formatted. Run: caddy fmt --overwrite Caddyfile"
+              exit 1
+            fi
+      - run:
+          name: Validate Caddyfile syntax
+          command: OLLAMA_API_KEY=ci-placeholder caddy validate --config Caddyfile
+
+  # ---------------------------------------------------------------------------
+  # ansible-lint — lint all Ansible playbooks and roles
+  # ---------------------------------------------------------------------------
+  ansible-lint:
+    docker:
+      - image: ghcr.io/ansible/community-ansible-dev-tools:latest
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Lint Ansible playbooks
+          command: ansible-lint ansible/
+
+  # ---------------------------------------------------------------------------
+  # kube-validate — schema-validate Kubernetes YAML with kubeconform
+  #
+  # Covers: stack.yml, stack-rocm.yml (Pod manifests + PVCs + ConfigMaps)
+  #         and llm-companion.kube (Quadlet Kube unit).
+  # ---------------------------------------------------------------------------
+  kube-validate:
+    executor: docker-alpine
+    steps:
+      - checkout
+      - run:
+          name: Install kubeconform
+          command: |
+            apk add --no-cache curl
+            curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+              | tar -xz -C /usr/local/bin kubeconform
+      - run:
+          name: Validate Kubernetes manifests
+          command: kubeconform -strict -summary stack.yml stack-rocm.yml llm-companion.kube
+
+  # ---------------------------------------------------------------------------
+  # check-spdx — ensure every source file has an SPDX-License-Identifier line
+  #
+  # Covers: shell scripts, Dockerfile, Caddyfile, Quadlet units, Modelfiles,
+  #         Docker Compose files, Kubernetes YAML, Ansible playbooks.
+  # LICENSE and LICENSE-CONTENT are data files and are intentionally excluded.
+  # ---------------------------------------------------------------------------
+  check-spdx:
+    executor: docker-alpine
+    steps:
+      - checkout
+      - run:
+          name: Check SPDX-License-Identifier headers
+          command: |
+            rc=0
+            for f in \
+              *.sh Dockerfile Caddyfile *.container *.network Modelfile.* \
+              *.yml *.kube \
+              ansible/**/*.yml; do
+              [ -f "$f" ] || continue
+              if ! grep -q "SPDX-License-Identifier:" "$f"; then
+                echo "MISSING SPDX header: $f"
+                rc=1
+              fi
+            done
+            exit $rc
+
+workflows:
+
+  # ---------------------------------------------------------------------------
+  # validate-changes — runs on all branches except gh-pages
+  # ---------------------------------------------------------------------------
+  validate-changes:
+    jobs:
+      - shellcheck:
+          <<: *ignore-gh-pages
+      - hadolint:
+          <<: *ignore-gh-pages
+      - caddy-validate:
+          <<: *ignore-gh-pages
+      - ansible-lint:
+          <<: *ignore-gh-pages
+      - kube-validate:
+          <<: *ignore-gh-pages
+      - check-spdx:
+          <<: *ignore-gh-pages
