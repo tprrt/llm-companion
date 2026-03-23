@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.qwen2.5-coder-32b — Qwen2.5-Coder 32B with 32k context
+#
+# TARGET: NVIDIA CUDA host with ≥ 20 GB VRAM (e.g. RTX 3090 / 4090, A5000).
+# This model WILL NOT fit on a GPU with less than 20 GB VRAM.
+#
+# Memory guide (Q4_K_M, ≈ 20 GB base):
+#   16k ctx → ~22 GB total  → needs 24 GB VRAM
+#   32k ctx → ~24 GB total  → needs 24 GB VRAM (tight on 24 GB cards)
+#
+# Create with:
+#   podman cp Modelfile.qwen2.5-coder-32b ollama:/tmp/
+#   podman exec -it ollama ollama create qwen2.5-coder-32b-32k \
+#       -f /tmp/Modelfile.qwen2.5-coder-32b
+# =============================================================================
+
+FROM qwen2.5-coder:32b
+
+# 32k context fits whole files + tool call history without truncation.
+# Drop to 16384 if you hit OOM; the model itself supports up to 128k.
+PARAMETER num_ctx 32768
+
+# Low temperature for deterministic, reliable code generation.
+PARAMETER temperature 0.15
