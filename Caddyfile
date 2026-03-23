@@ -32,6 +32,9 @@
 #
 # TLS:
 #   By default, TLS is OFF (plain HTTP on the internal network / VPN).
+#   WARNING: Do NOT expose port 8080 to the public internet without enabling
+#   TLS first. Plain HTTP leaks the Open WebUI login page and the Bearer
+#   token in transit. This default is safe only on a LAN or VPN.
 #   To enable TLS with a self-signed cert (good for LAN + VPN):
 #     - Uncomment the tls section below
 #     - Change the hostPort in stack.yml to 8443 (optional)
