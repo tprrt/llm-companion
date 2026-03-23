@@ -693,6 +693,19 @@ SSH into the VM and run the pull script directly:
    sudo firewall-cmd --list-ports        # should show 8080/tcp
    curl http://localhost:8080/           # verify Caddy responds
 
+**Models lost after service restart on Debian 12**
+
+This is a known limitation of Podman 4.3.x (shipped with Debian 12). The
+``llm-companion`` systemd service must prune unused volumes before each start
+to work around a bug where ``podman play kube`` fails with "volume already
+exists" if volumes from a previous run are still present. As a result,
+named volumes (``ollama-models``, ``open-webui-data``) are pruned on every
+restart and any pulled models must be re-downloaded.
+
+To retain models across restarts, upgrade to Podman 5.x (available via the
+`official Podman PPA <https://github.com/containers/podman/blob/main/install.md>`_
+or by upgrading to Debian 13+).
+
 **Qwen3 8B produces** ``<think>…</think>`` **blocks inside OpenCode**
 
 You are using the base ``qwen3:8b`` tag instead of ``qwen3-8b-16k``.
