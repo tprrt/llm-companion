@@ -517,6 +517,14 @@ This builds ``localhost/ollama-rocm:latest`` and deploys ``stack-rocm.yml``
 (which sets ``ROCR_VISIBLE_DEVICES=all`` and ``securityContext.privileged: true``
 for ``/dev/kfd`` + ``/dev/dri`` access) as the active stack manifest.
 
+.. warning::
+
+   ``stack-rocm.yml`` runs the Ollama container in **privileged mode**.
+   This is required for AMD GPU access (``/dev/kfd``, ``/dev/dri``) but
+   bypasses most kernel namespace isolation — a compromised container
+   process can affect the host. Only deploy the ROCm variant on a
+   dedicated, trusted host that is not shared with other workloads.
+
 Set ``HSA_OVERRIDE_GFX_VERSION`` in ``stack-rocm.yml`` if your card needs it
 (uncomment the env var and set the value to your gfx version string).
 
