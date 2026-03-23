@@ -149,11 +149,14 @@
     mode: "0755"
   when: ansible_os_family == "Debian"
 
-# Podman 4.3.x (Debian 12): `podman play kube --replace` tears down pods but
-# leaves named volumes, then fails when trying to create those volumes again.
-# Fix: use ExecStartPre to gracefully stop any existing pod first (the leading
-# '-' ignores failure on first start when nothing exists), then start without
-# --replace. Volumes persist across restarts as intended.
+# Podman 4.3.x (Debian 12): `podman play kube` always tries to create named
+# volumes defined as PVCs, even if they already exist, and fails with "volume
+# already exists" — both on --replace and on a plain restart.
+# Work-around: stop with --down (leaves volumes in place), prune unused
+# volumes (which frees the just-stopped volumes), then start fresh.
+# Trade-off: named volumes are NOT preserved across service restarts on
+# Debian 4.3.x. Upgrade to Podman 5.x for persistent volume support.
+# See the service unit comment below for the full caveat.
 - name: Write llm-companion systemd user service (Debian)
   ansible.builtin.copy:
     dest: "{{ ansible_user_dir }}/.config/systemd/user/llm-companion.service"
