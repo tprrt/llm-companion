@@ -126,10 +126,14 @@ declare -a MODELS=(
 
     # ── Any-arch CPU models (≤ 2 GB RAM) ───────────────────────────────────
     # Best code + tool-call model for constrained devices (ARM64, 2 GB+).
-    "Qwen2.5-Coder 1.5B|qwen2.5-coder:1.5b|2|0|16384||any|cpu|coding|Best code + tool-call at sub-2 GB; ~1 GB"
+    # ctx=4096: weights ~1 GB + KV cache ~0.3 GB = ~1.3 GB total.
+    # (ctx=16384 would add ~1.5 GB KV cache, exceeding the 2 GB effective RAM budget.)
+    "Qwen2.5-Coder 1.5B|qwen2.5-coder:1.5b|2|0|4096||any|cpu|coding|Best code + tool-call at sub-2 GB; ~1.3 GB at ctx=4k"
 
     # Best reasoning model for constrained devices; thinking disabled.
-    "Qwen3 1.7B|qwen3:1.7b|2|0|16384|SYSTEM \"/no_think\"|any|cpu|general|Best reasoning at sub-2 GB; thinking disabled; ~1.1 GB"
+    # ctx=4096: weights ~1.1 GB + KV cache ~0.44 GB = ~1.5 GB total.
+    # (ctx=16384 would add ~1.75 GB KV cache, pushing total to ~3.1 GB.)
+    "Qwen3 1.7B|qwen3:1.7b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|general|Best reasoning at sub-2 GB; thinking disabled; ~1.5 GB at ctx=4k"
 
     # Smallest vision model; fills vision gap on ARM64 and ≤ 2 GB hosts.
     "Moondream 2 1.8B|moondream:1.8b|2|0|2048||any|cpu|vision|Smallest vision model; image QA; ~1.1 GB"
