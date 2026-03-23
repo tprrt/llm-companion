@@ -83,9 +83,9 @@
     mode: "0600"
 
 # ── Apply secrets to Podman ───────────────────────────────────────────────────
-# Podman 5.x (RedHat/Fedora): `podman play kube` stores each key individually;
+# Podman 5.x: `podman play kube` stores each key individually;
 # `secretKeyRef` can extract them by name.
-- name: Apply secrets YAML to Podman (RedHat)
+- name: Apply secrets YAML to Podman (Podman 5.x)
   ansible.builtin.command:
     cmd: >
       podman play kube
@@ -93,71 +93,72 @@
       --replace
   register: secrets_apply_result
   changed_when: "'Created' in secrets_apply_result.stdout or secrets_apply_result.rc == 0"
-  when: ansible_os_family == "RedHat"
+  when: podman_version_major | int >= 5
 
 # Podman 4.3.x (Debian 12): `podman play kube` stores the entire YAML as raw
 # bytes. `secretKeyRef` then tries to parse those bytes as JSON and fails.
 # Fix: create the secret directly as a JSON object so 4.3.x can extract keys.
 # `podman secret create --replace` does not exist in Podman 4.3.x — remove then create.
-- name: Remove existing Podman secret if present (Debian)
+- name: Remove existing Podman secret if present (Podman 4.x)
   ansible.builtin.command:
     cmd: podman secret rm llm-companion-secrets
   failed_when: false
   changed_when: false
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
 
 # In Podman 4.3.x, secretKeyRef decodes each value from base64 (Kubernetes
 # convention: secret.data values are base64-encoded). Plain text values cause
 # "illegal base64 data" errors. Base64-encode the values inside the JSON.
-- name: Apply secrets to Podman as JSON (Debian)
+- name: Apply secrets to Podman as JSON (Podman 4.x)
   ansible.builtin.shell: |
     API_KEY_B64=$(printf '%s' "{{ llm_api_key }}" | base64 -w0)
     WEBUI_KEY_B64=$(printf '%s' "{{ llm_webui_secret }}" | base64 -w0)
     printf '{"ollama-api-key":"%s","webui-secret-key":"%s"}' "${API_KEY_B64}" "${WEBUI_KEY_B64}" \
       | podman secret create llm-companion-secrets -
   changed_when: true
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
 
-# ── Fedora / RedHat: Quadlet .kube unit ──────────────────────────────────────
-- name: Copy llm-companion.kube Quadlet unit (RedHat)
+# ── Podman 5.x: Quadlet .kube unit ───────────────────────────────────────────
+# Used on RedHat/Fedora and on Debian when Podman 5.x is installed via the
+# Kubic OBS repository (podman_kubic_repo: true).
+- name: Copy llm-companion.kube Quadlet unit (Podman 5.x)
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/llm-companion.kube"
     dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion.kube"
     remote_src: true
     mode: "0644"
-  when: ansible_os_family == "RedHat"
+  when: podman_version_major | int >= 5
 
-- name: Reload systemd user daemon (RedHat)
+- name: Reload systemd user daemon (Podman 5.x)
   ansible.builtin.systemd:
     daemon_reload: true
     scope: user
-  when: ansible_os_family == "RedHat"
+  when: podman_version_major | int >= 5
 
-- name: Enable and start llm-companion Quadlet service (RedHat)
+- name: Enable and start llm-companion Quadlet service (Podman 5.x)
   ansible.builtin.systemd:
     name: llm-companion
     scope: user
     state: started
     enabled: true
-  when: ansible_os_family == "RedHat"
+  when: podman_version_major | int >= 5
 
-# ── Debian: plain systemd user service ───────────────────────────────────────
-- name: Create ~/.config/systemd/user directory (Debian)
+# ── Podman 4.x: plain systemd user service ───────────────────────────────────
+# Used on Debian 12 when Podman 4.3.x is installed from the default apt repo
+# (podman_kubic_repo: false). Named volumes are NOT preserved across restarts
+# due to the "volume already exists" bug. Upgrade to Podman 5.x to fix this.
+- name: Create ~/.config/systemd/user directory (Podman 4.x)
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/.config/systemd/user"
     state: directory
     mode: "0755"
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
 
-# Podman 4.3.x (Debian 12): `podman play kube` always tries to create named
-# volumes defined as PVCs, even if they already exist, and fails with "volume
-# already exists" — both on --replace and on a plain restart.
-# Work-around: stop with --down (leaves volumes in place), prune unused
-# volumes (which frees the just-stopped volumes), then start fresh.
-# Trade-off: named volumes are NOT preserved across service restarts on
-# Debian 4.3.x. Upgrade to Podman 5.x for persistent volume support.
-# See the service unit comment below for the full caveat.
-- name: Write llm-companion systemd user service (Debian)
+# Podman 4.3.x always tries to create named volumes defined as PVCs, even if
+# they already exist, and fails with "volume already exists" on --replace and
+# on restart. Work-around: stop with --down, prune unused volumes, start fresh.
+# NOTE: named volumes do NOT persist across service restarts on Podman 4.3.x.
+- name: Write llm-companion systemd user service (Podman 4.x)
   ansible.builtin.copy:
     dest: "{{ ansible_user_dir }}/.config/systemd/user/llm-companion.service"
     mode: "0644"
@@ -174,7 +175,7 @@
       # PVCs in the YAML, even if they already exist, and fails with "volume
       # already exists". Work around this by pruning unused volumes after --down.
       # NOTE: this means named volumes do NOT persist across service restarts on
-      # Debian 4.3.x. Upgrade to Podman 5.x for persistent volume support.
+      # Podman 4.3.x. Set podman_kubic_repo: true to upgrade to Podman 5.x.
       ExecStartPre=-/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --down
       ExecStartPre=-/usr/bin/podman volume prune -f
       ExecStart=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml
@@ -182,18 +183,18 @@
 
       [Install]
       WantedBy=default.target
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
 
-- name: Reload systemd user daemon (Debian)
+- name: Reload systemd user daemon (Podman 4.x)
   ansible.builtin.systemd:
     daemon_reload: true
     scope: user
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
 
-- name: Enable and start llm-companion service (Debian)
+- name: Enable and start llm-companion service (Podman 4.x)
   ansible.builtin.systemd:
     name: llm-companion
     scope: user
     state: started
     enabled: true
-  when: ansible_os_family == "Debian"
+  when: podman_version_major | int < 5
