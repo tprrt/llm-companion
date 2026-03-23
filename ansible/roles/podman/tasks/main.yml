@@ -18,9 +18,40 @@
     name:
       - podman
       - buildah
+      - slirp4netns
+      - fuse-overlayfs
     state: present
     update_cache: true
   become: true
+  when: ansible_os_family == "Debian"
+
+# ── Debian: cgroupfs manager + overlay storage driver ────────────────────────
+# When Podman runs inside cloud-init (no systemd user session), crun tries to
+# reach D-Bus for cgroup management and hits a polkit permission error.
+# Setting cgroup_manager = "cgroupfs" bypasses D-Bus entirely.
+#
+# Rootless Podman on Debian defaults to the VFS storage driver, which makes a
+# full filesystem copy per layer and rapidly fills the disk. fuse-overlayfs
+# provides a proper overlay driver for rootless containers.
+- name: Configure Podman engine (Debian)
+  ansible.builtin.copy:
+    dest: "{{ ansible_env.HOME }}/.config/containers/containers.conf"
+    content: |
+      [engine]
+      cgroup_manager = "cgroupfs"
+    mode: "0644"
+  when: ansible_os_family == "Debian"
+
+- name: Configure Podman storage to use fuse-overlayfs (Debian)
+  ansible.builtin.copy:
+    dest: "{{ ansible_env.HOME }}/.config/containers/storage.conf"
+    content: |
+      [storage]
+      driver = "overlay"
+
+      [storage.options.overlay]
+      mount_program = "/usr/bin/fuse-overlayfs"
+    mode: "0644"
   when: ansible_os_family == "Debian"
 
 # ── SELinux boolean (RedHat only) ─────────────────────────────────────────────

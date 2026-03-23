@@ -83,7 +83,9 @@
     mode: "0600"
 
 # ── Apply secrets to Podman ───────────────────────────────────────────────────
-- name: Apply secrets YAML to Podman
+# Podman 5.x (RedHat/Fedora): `podman play kube` stores each key individually;
+# `secretKeyRef` can extract them by name.
+- name: Apply secrets YAML to Podman (RedHat)
   ansible.builtin.command:
     cmd: >
       podman play kube
@@ -91,6 +93,30 @@
       --replace
   register: secrets_apply_result
   changed_when: "'Created' in secrets_apply_result.stdout or secrets_apply_result.rc == 0"
+  when: ansible_os_family == "RedHat"
+
+# Podman 4.3.x (Debian 12): `podman play kube` stores the entire YAML as raw
+# bytes. `secretKeyRef` then tries to parse those bytes as JSON and fails.
+# Fix: create the secret directly as a JSON object so 4.3.x can extract keys.
+# `podman secret create --replace` does not exist in Podman 4.3.x — remove then create.
+- name: Remove existing Podman secret if present (Debian)
+  ansible.builtin.command:
+    cmd: podman secret rm llm-companion-secrets
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+# In Podman 4.3.x, secretKeyRef decodes each value from base64 (Kubernetes
+# convention: secret.data values are base64-encoded). Plain text values cause
+# "illegal base64 data" errors. Base64-encode the values inside the JSON.
+- name: Apply secrets to Podman as JSON (Debian)
+  ansible.builtin.shell: |
+    API_KEY_B64=$(printf '%s' "{{ llm_api_key }}" | base64 -w0)
+    WEBUI_KEY_B64=$(printf '%s' "{{ llm_webui_secret }}" | base64 -w0)
+    printf '{"ollama-api-key":"%s","webui-secret-key":"%s"}' "${API_KEY_B64}" "${WEBUI_KEY_B64}" \
+      | podman secret create llm-companion-secrets -
+  changed_when: true
+  when: ansible_os_family == "Debian"
 
 # ── Fedora / RedHat: Quadlet .kube unit ──────────────────────────────────────
 - name: Copy llm-companion.kube Quadlet unit (RedHat)
@@ -123,6 +149,11 @@
     mode: "0755"
   when: ansible_os_family == "Debian"
 
+# Podman 4.3.x (Debian 12): `podman play kube --replace` tears down pods but
+# leaves named volumes, then fails when trying to create those volumes again.
+# Fix: use ExecStartPre to gracefully stop any existing pod first (the leading
+# '-' ignores failure on first start when nothing exists), then start without
+# --replace. Volumes persist across restarts as intended.
 - name: Write llm-companion systemd user service (Debian)
   ansible.builtin.copy:
     dest: "{{ ansible_user_dir }}/.config/systemd/user/llm-companion.service"
@@ -136,7 +167,14 @@
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStart=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --replace
+      # Podman 4.3.x (Debian 12) always tries to create named volumes defined as
+      # PVCs in the YAML, even if they already exist, and fails with "volume
+      # already exists". Work around this by pruning unused volumes after --down.
+      # NOTE: this means named volumes do NOT persist across service restarts on
+      # Debian 4.3.x. Upgrade to Podman 5.x for persistent volume support.
+      ExecStartPre=-/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --down
+      ExecStartPre=-/usr/bin/podman volume prune -f
+      ExecStart=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml
       ExecStop=/usr/bin/podman play kube %h/.config/containers/systemd/stack.yml --down
 
       [Install]
