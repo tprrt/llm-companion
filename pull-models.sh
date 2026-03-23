@@ -73,6 +73,16 @@ info "Accelerator  : ${ACCEL_LABEL}"
 info "RAM          : ${TOTAL_RAM_GB} GB total — ${RESERVE_GB} GB reserved — ${EFFECTIVE_RAM_GB} GB effective"
 echo ""
 
+# NVIDIA CUDA is detected and VRAM-gated, but no model in the catalogue
+# carries accel=cuda. GPU-compatible models (accel=any_gpu) still work on
+# CUDA; this note prevents confusion when users see "need AMD ROCm" skips.
+if [[ "$ACCEL" == "cuda" ]]; then
+    warn "NVIDIA CUDA detected — no CUDA-specific models in the catalogue yet."
+    warn "GPU-compatible (any_gpu) models run when VRAM requirements are met."
+    warn "ROCm-only model skips in the table above are expected."
+    echo ""
+fi
+
 # ── Container check ───────────────────────────────────────────────────────────
 if ! $LIST_ONLY; then
     podman inspect "${CONTAINER_NAME}" &>/dev/null || \
