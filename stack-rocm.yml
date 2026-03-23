@@ -92,6 +92,8 @@ data:
 
     :8080 {
       # ── TLS (disabled by default) ──────────────────────────────────────
+      # WARNING: plain HTTP only — do NOT expose port 8080 to the public
+      # internet without enabling TLS. Safe for LAN / VPN use only.
       # Uncomment to enable a self-signed cert (trustable on LAN/VPN):
       # tls internal
       # Uncomment for ACME/Let's Encrypt with a public domain:
