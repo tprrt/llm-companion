@@ -105,6 +105,10 @@ fi
 declare -a MODELS=(
     # ── GPU models ──────────────────────────────────────────────────────────
     # Best-in-class for agentic SWE work; requires a GPU with ≥ 16 GB VRAM.
+    # ctx=32768: Devstral is purpose-built for multi-file agentic editing; the
+    # larger context window (vs 16384 for CPU models) fits whole files + tool
+    # call history without truncation. GPU VRAM makes the extra KV cache
+    # (~2 GB over 16k) affordable; CPU hosts use 16k to avoid OOM.
     "Devstral-Small-2 24B|devstral-small-2:24b|0|16|32768||any|any_gpu|coding|SWE-bench leader, purpose-built agentic coding, ~15 GB"
 
     # Best GPU general + vision model; complements Devstral on the same host.
