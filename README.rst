@@ -50,6 +50,13 @@ Stack architecture
 - **Open WebUI** runs on port **3000** internally (not 8080, to avoid conflicting with Caddy)
 - **Caddy** enforces a Bearer token on all ``/ollama/api/*`` and ``/ollama/v1/*`` requests
 
+.. warning::
+
+   TLS is **disabled by default** (plain HTTP). Do **not** expose port 8080
+   to the public internet without enabling TLS in the Caddyfile — the Open
+   WebUI login page and Bearer token would be transmitted in clear text.
+   This default configuration is safe only on a LAN or VPN.
+
 ----
 
 Deployment roadmap
