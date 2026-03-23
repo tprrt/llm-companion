@@ -213,6 +213,14 @@ spec:
           value: "false"
         - name: ENABLE_SIGNUP
           value: "true"
+        # Use Ollama for RAG embeddings instead of loading sentence-transformer
+        # models locally inside open-webui. Without this, open-webui loads
+        # PyTorch ML models into memory at runtime, consuming 1-2 GB that is
+        # then unavailable to Ollama when loading chat models.
+        # RAG works once an embedding model is pulled in Ollama (e.g.
+        # `ollama pull nomic-embed-text`). Until then, RAG is simply inactive.
+        - name: RAG_EMBEDDING_ENGINE
+          value: "ollama"
         # Secret key for session signing — read from the Kubernetes Secret.
         - name: WEBUI_SECRET_KEY
           valueFrom:
