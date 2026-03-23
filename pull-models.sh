@@ -73,16 +73,6 @@ info "Accelerator  : ${ACCEL_LABEL}"
 info "RAM          : ${TOTAL_RAM_GB} GB total — ${RESERVE_GB} GB reserved — ${EFFECTIVE_RAM_GB} GB effective"
 echo ""
 
-# NVIDIA CUDA is detected and VRAM-gated, but no model in the catalogue
-# carries accel=cuda. GPU-compatible models (accel=any_gpu) still work on
-# CUDA; this note prevents confusion when users see "need AMD ROCm" skips.
-if [[ "$ACCEL" == "cuda" ]]; then
-    warn "NVIDIA CUDA detected — no CUDA-specific models in the catalogue yet."
-    warn "GPU-compatible (any_gpu) models run when VRAM requirements are met."
-    warn "ROCm-only model skips in the table above are expected."
-    echo ""
-fi
-
 # ── Container check ───────────────────────────────────────────────────────────
 if ! $LIST_ONLY; then
     podman inspect "${CONTAINER_NAME}" &>/dev/null || \
@@ -116,6 +106,14 @@ declare -a MODELS=(
 
     # Best GPU coding model for hosts with 10–15 GB VRAM (fills Devstral gap).
     "Qwen2.5-Coder 14B|qwen2.5-coder:14b|0|10|32768||any|any_gpu|coding|Reliable tool-call format; mid-GPU tier; ~9 GB"
+
+    # ── CUDA models (NVIDIA CUDA, ≥ 20 GB VRAM) ─────────────────────────────
+    # Larger coding model for the 24 GB VRAM tier; fills the gap between
+    # Devstral-Small-2 (16 GB gate) and smaller any_gpu models.
+    "Qwen2.5-Coder 32B|qwen2.5-coder:32b|0|20|32768||any|cuda|coding|Top open coding model; 24 GB tier; ~20 GB"
+
+    # Best open reasoning model at the 24 GB VRAM tier; chain-of-thought native.
+    "DeepSeek-R1 32B|deepseek-r1:32b|0|20|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB"
 
     # ── x86_64 CPU models (8 GB+ RAM) ──────────────────────────────────────
     # Best open agentic model at the 8 GB CPU tier.
@@ -162,11 +160,11 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "devstral-small-2:24b" "qwen2.5-coder:14b" "qwen3:8b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
+CODING_PRIORITY=(     "devstral-small-2:24b" "qwen2.5-coder:32b" "qwen2.5-coder:14b" "qwen3:8b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
 # shellcheck disable=SC2034
 VISION_PRIORITY=(     "ministral-3:14b"      "ministral-3:8b" "ministral-3:3b" "moondream:1.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "ministral-3:14b"      "qwen3:8b" "deepseek-r1:7b" "ministral-3:8b" "gemma3:4b" "ministral-3:3b" "qwen3:1.7b" )
+GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3:8b" "deepseek-r1:7b" "ministral-3:8b" "gemma3:4b" "ministral-3:3b" "qwen3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
 
