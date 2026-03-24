@@ -9,13 +9,6 @@ llm_web_port: 8080
 # Ansible copies stack.yml from here. The Dockerfile must also be here.
 llm_project_dir: "{{ ansible_user_dir }}/llm-companion"
 
-# ── Podman (Debian only) ──────────────────────────────────────────────────────
-# Set to true to install Podman 5.x via the Kubic OBS repository on Debian 12.
-# This fixes the "volume already exists" bug in Podman 4.3.x, enables Quadlet
-# support, and preserves named volumes across service restarts.
-# Requires internet access to download.opensuse.org during provisioning.
-podman_kubic_repo: false
-
 # ── Ollama build ──────────────────────────────────────────────────────────────
 # Build target: 'cpu' or 'rocm'
 ollama_build_target: cpu

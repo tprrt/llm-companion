@@ -275,9 +275,9 @@ spec:
       # when Caddy tries to bind privileged ports (even :8080 on some kernels).
       # The securityContext block is intentionally omitted here.
       volumeMounts:
+        # Mount the full ConfigMap directory so Caddyfile lands at /etc/caddy/Caddyfile.
         - name: caddyfile
-          mountPath: /etc/caddy/Caddyfile
-          subPath: Caddyfile
+          mountPath: /etc/caddy/
           readOnly: true
         - name: caddy-data
           mountPath: /data
