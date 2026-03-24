@@ -12,7 +12,7 @@
 llm-companion — Podman Kubernetes Pod stack for Fedora Server
 =============================================================
 
-Rootless Ollama server for **Fedora Server 41+** and **Debian 12+**, managed via
+Rootless Ollama server for **Fedora Server 41+** and **Debian 13+**, managed via
 a single Kubernetes Pod manifest (``stack.yml``) deployed by Ansible.
 Multi-arch ready: x86-64 (CPU + AMD ROCm GPU) and ARM64.
 

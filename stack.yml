@@ -269,10 +269,7 @@ spec:
       # when Caddy tries to bind privileged ports (even :8080 on some kernels).
       # The securityContext block is intentionally omitted here.
       volumeMounts:
-        # Mount the full ConfigMap directory to /etc/caddy/ so Caddyfile is at
-        # /etc/caddy/Caddyfile. Using a directory mountPath (not subPath) is
-        # required for Podman 4.3.x compatibility — subPath on ConfigMap volumes
-        # is not supported and causes a crun "Not a directory" error.
+        # Mount the full ConfigMap directory so Caddyfile lands at /etc/caddy/Caddyfile.
         - name: caddyfile
           mountPath: /etc/caddy/
           readOnly: true
