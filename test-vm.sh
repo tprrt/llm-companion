@@ -70,7 +70,7 @@ SSH_PORT=2222
 WEB_PORT=8080
 DISTRO="fedora"
 FEDORA_VERSION=43
-DEBIAN_VERSION=12
+DEBIAN_VERSION=13
 VM_IMAGE=""
 
 # ── Subcommand ────────────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ if [[ -z "${VM_IMAGE}" ]]; then
             VM_IMAGE="${VM_DIR}/${IMAGE_NAME}"
             ;;
         debian)
-            IMAGES_URL="https://cloud.debian.org/images/cloud/bookworm/latest"
+            IMAGES_URL="https://cloud.debian.org/images/cloud/trixie/latest"
             IMAGE_NAME="debian-${DEBIAN_VERSION}-generic-amd64.qcow2"
             info "Using Debian ${DEBIAN_VERSION} Cloud image: ${IMAGE_NAME}"
             VM_IMAGE="${VM_DIR}/${IMAGE_NAME}"
