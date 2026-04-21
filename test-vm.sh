@@ -13,12 +13,13 @@
 # Subcommands:
 #   start     Start the VM, stream console logs, exit when ready
 #   stop      Stop the running VM
-#   reset     Stop + delete overlay disk (keeps downloaded base image)
+#   clean     Stop + delete overlay/seed for all distros (or --distro only)
+#   mrproper  Like clean, but also delete the downloaded base image(s)
 #   status    Show whether the VM is running and its connection info
 #   logs      Stream the VM console log (tail -f)
 #   console   Open an SSH session into the running VM
 #
-# Options (start only):
+# Options (start only, except --distro which also applies to clean/mrproper):
 #   --distro DISTRO   Target distribution: fedora or debian  (default: fedora)
 #   --ram GB          VM RAM in gigabytes (≥ 1)              (default: 8)
 #   --cpus N          Number of vCPUs                        (default: 4)
@@ -78,25 +79,20 @@ SUBCMD="${1:-start}"
 shift || true
 
 case "${SUBCMD}" in
-    start|stop|reset|status|logs|console) ;;
+    start|stop|clean|mrproper|status|logs|console) ;;
     --help|-h)
         sed -n '/^# Usage:/,/^# =/{ /^# =/d; s/^# \{0,1\}//; p }' "$0"
         exit 0
         ;;
-    *) echo "Unknown subcommand: ${SUBCMD}. Use: start stop reset status logs console"; exit 1 ;;
+    *) echo "Unknown subcommand: ${SUBCMD}. Use: start stop clean mrproper status logs console"; exit 1 ;;
 esac
 
-# ── Load persisted distro (written by 'start', read by all other subcommands) ─
-# Loaded before option parsing so --distro can override it.
-DISTRO_FILE="${VM_DIR}/distro"
-if [[ "${SUBCMD}" != "start" && -f "${DISTRO_FILE}" ]]; then
-    DISTRO=$(cat "${DISTRO_FILE}")
-fi
-
-# ── Options (only meaningful for 'start') ─────────────────────────────────────
+# ── Options ───────────────────────────────────────────────────────────────────
+# --distro applies to start, clean, and mrproper; other options only to start.
+DISTRO_SET=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --distro)   DISTRO="$2";    shift 2 ;;
+        --distro)   DISTRO="$2"; DISTRO_SET=true; shift 2 ;;
         --ram)      RAM_GB="$2";    shift 2 ;;
         --cpus)     CPUS="$2";      shift 2 ;;
         --disk)     DISK_GB="$2";   shift 2 ;;
@@ -111,6 +107,13 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+# ── Load persisted distro (written by 'start', read by all other subcommands) ─
+# Computed after option parsing so --vm-dir is honoured; --distro takes priority.
+DISTRO_FILE="${VM_DIR}/distro"
+if [[ "${SUBCMD}" != "start" && -f "${DISTRO_FILE}" && "${DISTRO_SET}" == "false" ]]; then
+    DISTRO=$(cat "${DISTRO_FILE}")
+fi
 
 # ── Validate distro and derive per-distro settings ────────────────────────────
 case "${DISTRO}" in
@@ -181,16 +184,107 @@ if [[ "${SUBCMD}" == "stop" ]]; then
     exit 0
 fi
 
-# ── reset ─────────────────────────────────────────────────────────────────────
-if [[ "${SUBCMD}" == "reset" ]]; then
-    vm_stop
-    if [[ -f "${OVERLAY}" ]]; then
-        rm -f "${OVERLAY}" "${SEED_ISO}" \
-              "${VM_DIR}/user-data-${DISTRO}" "${VM_DIR}/meta-data-${DISTRO}" \
-              "${VM_DIR}/llm-setup-${DISTRO}.sh" "${VM_DIR}/console-${DISTRO}.log"
-        info "Overlay and seed for ${DISTRO} deleted. Run 'start --distro ${DISTRO}' for a fresh VM."
+# ── clean / mrproper helpers ──────────────────────────────────────────────────
+# Delete build artifacts (overlay, seed, cloud-init files) for one distro.
+# The console log is preserved on clean; mrproper removes it separately.
+clean_one() {
+    local d="$1"
+    rm -f "${VM_DIR}/overlay-${d}.qcow2" \
+          "${VM_DIR}/seed-${d}.iso" \
+          "${VM_DIR}/user-data-${d}" \
+          "${VM_DIR}/meta-data-${d}" \
+          "${VM_DIR}/llm-setup-${d}.sh"
+}
+
+# Return true if any cleanable artifact exists for distro d.
+distro_has_artifacts() {
+    local d="$1"
+    [[ -f "${VM_DIR}/overlay-${d}.qcow2" ]] || \
+    [[ -f "${VM_DIR}/seed-${d}.iso" ]] || \
+    [[ -f "${VM_DIR}/user-data-${d}" ]] || \
+    [[ -f "${VM_DIR}/meta-data-${d}" ]] || \
+    [[ -f "${VM_DIR}/llm-setup-${d}.sh" ]]
+}
+
+# Return true if the downloaded base image exists for distro d.
+distro_has_base_image() {
+    local d="$1"
+    case "${d}" in
+        fedora) compgen -G "${VM_DIR}/Fedora-Cloud-Base-*.qcow2" > /dev/null 2>&1 ;;
+        debian) compgen -G "${VM_DIR}/debian-*.qcow2" > /dev/null 2>&1 ;;
+    esac
+}
+
+# Delete the downloaded base image(s) for one distro.
+delete_base_image() {
+    local d="$1"
+    case "${d}" in
+        fedora) rm -f "${VM_DIR}"/Fedora-Cloud-Base-*.qcow2 ;;
+        debian) rm -f "${VM_DIR}"/debian-*.qcow2 ;;
+    esac
+}
+
+# Stop the VM only if it belongs to the given distro.
+stop_if_running_distro() {
+    local d="$1"
+    local running_distro=""
+    [[ -f "${DISTRO_FILE}" ]] && running_distro=$(cat "${DISTRO_FILE}")
+    if vm_is_running && [[ "${running_distro}" == "${d}" ]]; then
+        vm_stop
+    fi
+}
+
+# ── clean ─────────────────────────────────────────────────────────────────────
+if [[ "${SUBCMD}" == "clean" ]]; then
+    if $DISTRO_SET; then
+        stop_if_running_distro "${DISTRO}"
+        if distro_has_artifacts "${DISTRO}"; then
+            clean_one "${DISTRO}"
+            info "Artifacts for ${DISTRO} deleted."
+        else
+            info "Nothing to clean for ${DISTRO}."
+        fi
     else
-        info "Nothing to reset for ${DISTRO}."
+        vm_stop
+        shopt -s nullglob
+        artifacts=( "${VM_DIR}"/overlay-*.qcow2 "${VM_DIR}"/seed-*.iso
+                    "${VM_DIR}"/user-data-*     "${VM_DIR}"/meta-data-*
+                    "${VM_DIR}"/llm-setup-*.sh )
+        shopt -u nullglob
+        if [[ ${#artifacts[@]} -gt 0 ]] || [[ -f "${DISTRO_FILE}" ]]; then
+            rm -f "${artifacts[@]}" "${DISTRO_FILE}"
+            info "All distro artifacts deleted."
+        else
+            info "Nothing to clean."
+        fi
+    fi
+    exit 0
+fi
+
+# ── mrproper ──────────────────────────────────────────────────────────────────
+if [[ "${SUBCMD}" == "mrproper" ]]; then
+    if $DISTRO_SET; then
+        stop_if_running_distro "${DISTRO}"
+        if distro_has_artifacts "${DISTRO}" || distro_has_base_image "${DISTRO}" \
+           || [[ -f "${VM_DIR}/console-${DISTRO}.log" ]]; then
+            clean_one "${DISTRO}"
+            rm -f "${VM_DIR}/console-${DISTRO}.log"
+            delete_base_image "${DISTRO}"
+            info "Artifacts and base image for ${DISTRO} deleted."
+        else
+            info "Nothing to clean for ${DISTRO}."
+        fi
+    else
+        vm_stop
+        shopt -s nullglob
+        artifacts=( "${VM_DIR}"/overlay-*.qcow2 "${VM_DIR}"/seed-*.iso
+                    "${VM_DIR}"/console-*.log   "${VM_DIR}"/user-data-*
+                    "${VM_DIR}"/meta-data-*     "${VM_DIR}"/llm-setup-*.sh )
+        shopt -u nullglob
+        rm -f "${artifacts[@]}" "${DISTRO_FILE}"
+        delete_base_image fedora
+        delete_base_image debian
+        info "All artifacts and base images deleted."
     fi
     exit 0
 fi
@@ -338,7 +432,7 @@ fi
 
 # ── cloud-init seed (created once, paired with the overlay disk) ──────────────
 # Regenerated only when the overlay doesn't exist (i.e. on first start or after
-# reset). On stop+start the existing seed is reused so cloud-init sees the same
+# clean/mrproper). On stop+start the existing seed is reused so cloud-init sees the same
 # instance-id and skips once-per-instance modules.
 if [[ ! -f "${SEED_ISO}" ]]; then
 
@@ -614,7 +708,8 @@ echo "  Console:      ./test-vm.sh console"
 echo "  Logs:         ./test-vm.sh logs"
 echo "  Status:       ./test-vm.sh status"
 echo "  Stop:         ./test-vm.sh stop"
-echo "  Fresh reset:  ./test-vm.sh reset  (keeps downloaded ${DISTRO} image)"
+echo "  Clean:        ./test-vm.sh clean [--distro ${DISTRO}]  (keeps downloaded base image)"
+echo "  Mr. Proper:   ./test-vm.sh mrproper [--distro ${DISTRO}]"
 echo ""
 echo "  Pull models:  ./test-vm.sh console"
 echo "                  ./llm-companion/pull-models.sh"
