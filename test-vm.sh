@@ -611,10 +611,12 @@ step "Creating cloud-init seed ISO..."
 case "${ISO_TOOL}" in
     genisoimage|mkisofs)
         "${ISO_TOOL}" -output "${SEED_ISO}" -volid cidata -joliet -rock \
-            "${USERDATA}" "${METADATA}" 2>/dev/null ;;
+            -graft-points \
+            "user-data=${USERDATA}" "meta-data=${METADATA}" 2>/dev/null ;;
     xorriso)
         xorriso -as mkisofs -output "${SEED_ISO}" -volid cidata -joliet -rock \
-            "${USERDATA}" "${METADATA}" 2>/dev/null ;;
+            -graft-points \
+            "user-data=${USERDATA}" "meta-data=${METADATA}" 2>/dev/null ;;
 esac
 
 fi # end: seed ISO creation (skipped on stop+start)
