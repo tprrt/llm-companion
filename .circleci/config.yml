@@ -170,7 +170,7 @@ jobs:
       - run:
           name: Check Caddyfile is in sync with ConfigMaps in stack manifests
           command: |
-            python3 - <<'PYEOF'
+            python3 - \<<'PYEOF'
             import sys, yaml
 
             def normalize(text):
