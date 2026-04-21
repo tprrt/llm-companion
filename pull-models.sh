@@ -116,12 +116,10 @@ declare -a MODELS=(
     "DeepSeek-R1 32B|deepseek-r1:32b|0|20|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB"
 
     # ── x86_64 CPU models (8 GB+ RAM) ──────────────────────────────────────
-    # Best open agentic model at the 8 GB CPU tier.
-    # Thinking mode disabled via /no_think for faster, predictable tool calls.
-    "Qwen3 8B|qwen3:8b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,general|Best agentic tool-use at 8 GB; thinking disabled; ~5 GB"
-
-    # Best vision + general model at the 8 GB CPU tier.
-    "Ministral-3 8B|ministral-3:8b|8|0|16384||x86_64|cpu|vision,general|Vision; strong instruction following; multilingual; ~5 GB"
+    # Best open agentic model at the 8 GB CPU tier; native multimodal (vision
+    # built-in). Replaces both Qwen3 8B (coding+general) and Ministral-3 8B
+    # (vision) with a single model. Thinking disabled for tool calls.
+    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks; ~5.5 GB"
 
     # Most reliable tool-call format compatibility — use if Qwen3 breaks tools.
     "Qwen2.5-Coder 7B|qwen2.5-coder:7b|6|0|16384||x86_64|cpu|coding|Most reliable tool-call format; ~4.5 GB"
@@ -133,8 +131,8 @@ declare -a MODELS=(
     # Smallest vision-capable model; also useful as a fast general fallback.
     "Ministral-3 3B|ministral-3:3b|4|0|16384||any|cpu|vision,general|Vision; 40+ languages; fast fallback; ~2 GB"
 
-    # Google Gemma 3 4B — strong reasoning + instruction following; any arch.
-    "Gemma 3 4B|gemma3:4b|4|0|8192||any|cpu|general|Strong Google model; outperforms Qwen3 1.7B; ~3 GB"
+    # Google Gemma 4 4B edge — native multimodal; clear upgrade over Gemma 3 4B.
+    "Gemma 4 4B|gemma4:e4b|4|0|8192||any|cpu|vision,general|Native multimodal; Gemma 4 edge model; strong reasoning; ~2.5 GB"
 
     # ── Any-arch CPU models (≤ 2 GB RAM) ───────────────────────────────────
     # Best code + tool-call model for constrained devices (ARM64, 2 GB+).
@@ -143,9 +141,9 @@ declare -a MODELS=(
     "Qwen2.5-Coder 1.5B|qwen2.5-coder:1.5b|2|0|4096||any|cpu|coding|Best code + tool-call at sub-2 GB; ~1.3 GB at ctx=4k"
 
     # Best reasoning model for constrained devices; thinking disabled.
-    # ctx=4096: weights ~1.1 GB + KV cache ~0.44 GB = ~1.5 GB total.
-    # (ctx=16384 would add ~1.75 GB KV cache, pushing total to ~3.1 GB.)
-    "Qwen3 1.7B|qwen3:1.7b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|general|Best reasoning at sub-2 GB; thinking disabled; ~1.5 GB at ctx=4k"
+    # ctx=4096: weights ~1.2 GB + KV cache ~0.44 GB = ~1.6 GB total.
+    # (ctx=16384 would add ~1.75 GB KV cache, pushing total to ~3 GB.)
+    "Qwen3.5 2B|qwen3.5:2b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|general|Native multimodal; better than Qwen3 1.7B; thinking disabled; ~1.6 GB at ctx=4k"
 
     # Smallest vision model; fills vision gap on ARM64 and ≤ 2 GB hosts.
     "Moondream 2 1.8B|moondream:1.8b|2|0|2048||any|cpu|vision|Smallest vision model; image QA; ~1.1 GB"
@@ -160,11 +158,11 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "devstral-small-2:24b" "qwen2.5-coder:32b" "qwen2.5-coder:14b" "qwen3:8b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
+CODING_PRIORITY=(     "devstral-small-2:24b" "qwen2.5-coder:32b" "qwen2.5-coder:14b" "qwen3.5:9b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
 # shellcheck disable=SC2034
-VISION_PRIORITY=(     "ministral-3:14b"      "ministral-3:8b" "ministral-3:3b" "moondream:1.8b" )
+VISION_PRIORITY=(     "ministral-3:14b"      "qwen3.5:9b" "gemma4:e4b" "ministral-3:3b" "moondream:1.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3:8b" "deepseek-r1:7b" "ministral-3:8b" "gemma3:4b" "ministral-3:3b" "qwen3:1.7b" )
+GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3.5:9b" "deepseek-r1:7b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:2b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
 
