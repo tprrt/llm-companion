@@ -642,6 +642,9 @@ QEMU_CMD=(
     -smp      "${CPUS}"
     -drive    "file=${OVERLAY},format=qcow2,if=virtio"
     -drive    "file=${SEED_ISO},format=raw,if=virtio,readonly=on"
+    # Force cloud-init to use the NoCloud datasource regardless of the distro's
+    # datasource_list config (Fedora 43+ excludes NoCloud by default).
+    -smbios   "type=1,serial=ds=nocloud"
     # Share the project directory read-only via 9p virtfs.
     # The VM mounts this at /mnt/llm-companion and copies files from there.
     -virtfs   "local,path=${SCRIPT_DIR},mount_tag=llm-companion,security_model=none,readonly=on"
