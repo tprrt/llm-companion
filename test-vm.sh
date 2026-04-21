@@ -86,6 +86,13 @@ case "${SUBCMD}" in
     *) echo "Unknown subcommand: ${SUBCMD}. Use: start stop reset status logs console"; exit 1 ;;
 esac
 
+# ── Load persisted distro (written by 'start', read by all other subcommands) ─
+# Loaded before option parsing so --distro can override it.
+DISTRO_FILE="${VM_DIR}/distro"
+if [[ "${SUBCMD}" != "start" && -f "${DISTRO_FILE}" ]]; then
+    DISTRO=$(cat "${DISTRO_FILE}")
+fi
+
 # ── Options (only meaningful for 'start') ─────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -104,12 +111,6 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
-
-# ── Load persisted distro (written by 'start', read by all other subcommands) ─
-DISTRO_FILE="${VM_DIR}/distro"
-if [[ "${SUBCMD}" != "start" && -f "${DISTRO_FILE}" ]]; then
-    DISTRO=$(cat "${DISTRO_FILE}")
-fi
 
 # ── Validate distro and derive per-distro settings ────────────────────────────
 case "${DISTRO}" in
@@ -133,8 +134,13 @@ fi
 RAM_MB=$(( RAM_GB * 1024 ))
 
 # ── Paths derived from VM_DIR (available to all subcommands) ──────────────────
+# Distro-suffixed artifacts allow multiple distros to coexist under the same
+# vm-test directory; switching distros with 'start --distro X' never clobbers
+# another distro's overlay or seed.
 PID_FILE="${VM_DIR}/qemu.pid"
-CONSOLE_LOG="${VM_DIR}/console.log"
+CONSOLE_LOG="${VM_DIR}/console-${DISTRO}.log"
+OVERLAY="${VM_DIR}/overlay-${DISTRO}.qcow2"
+SEED_ISO="${VM_DIR}/seed-${DISTRO}.iso"
 VM_SSH_KEY="${VM_DIR}/vm_key"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -178,13 +184,13 @@ fi
 # ── reset ─────────────────────────────────────────────────────────────────────
 if [[ "${SUBCMD}" == "reset" ]]; then
     vm_stop
-    OVERLAY="${VM_DIR}/overlay.qcow2"
     if [[ -f "${OVERLAY}" ]]; then
-        rm -f "${OVERLAY}" "${VM_DIR}/seed.iso" "${VM_DIR}/user-data" \
-              "${VM_DIR}/meta-data" "${VM_DIR}/llm-setup.sh" "${DISTRO_FILE}"
-        info "Overlay disk and cloud-init seed deleted. Run 'start' for a fresh VM."
+        rm -f "${OVERLAY}" "${SEED_ISO}" \
+              "${VM_DIR}/user-data-${DISTRO}" "${VM_DIR}/meta-data-${DISTRO}" \
+              "${VM_DIR}/llm-setup-${DISTRO}.sh" "${VM_DIR}/console-${DISTRO}.log"
+        info "Overlay and seed for ${DISTRO} deleted. Run 'start --distro ${DISTRO}' for a fresh VM."
     else
-        info "Nothing to reset."
+        info "Nothing to reset for ${DISTRO}."
     fi
     exit 0
 fi
@@ -305,7 +311,6 @@ if [[ ! -f "${VM_IMAGE}" ]]; then
 fi
 
 # ── qcow2 overlay disk ────────────────────────────────────────────────────────
-OVERLAY="${VM_DIR}/overlay.qcow2"
 if [[ ! -f "${OVERLAY}" ]]; then
     step "Creating ${DISK_GB}G overlay disk..."
     qemu-img create -f qcow2 -b "$(realpath "${VM_IMAGE}")" -F qcow2 "${OVERLAY}" "${DISK_GB}G"
@@ -335,15 +340,13 @@ fi
 # Regenerated only when the overlay doesn't exist (i.e. on first start or after
 # reset). On stop+start the existing seed is reused so cloud-init sees the same
 # instance-id and skips once-per-instance modules.
-SEED_ISO="${VM_DIR}/seed.iso"
-
 if [[ ! -f "${SEED_ISO}" ]]; then
 
 # ── cloud-init: in-VM setup script ───────────────────────────────────────────
 # Written to a file first, then base64-encoded into the cloud-init user-data.
 # Runs as root (cloud-init runcmd); user-facing commands run via sudo -u <user>.
 
-SETUP_SCRIPT="${VM_DIR}/llm-setup.sh"
+SETUP_SCRIPT="${VM_DIR}/llm-setup-${DISTRO}.sh"
 
 if [[ "${DISTRO}" == "fedora" ]]; then
 cat > "${SETUP_SCRIPT}" << 'SETUP'
@@ -457,7 +460,7 @@ fi
 chmod +x "${SETUP_SCRIPT}"
 
 # ── cloud-init user-data ──────────────────────────────────────────────────────
-USERDATA="${VM_DIR}/user-data"
+USERDATA="${VM_DIR}/user-data-${DISTRO}"
 
 # Embed the setup script as base64 to avoid YAML escaping issues.
 SETUP_B64=$(base64 -w0 "${SETUP_SCRIPT}")
@@ -500,7 +503,7 @@ power_state:
   message: "llm-companion setup complete — rebooting to start llm-companion service"
 YAML
 
-METADATA="${VM_DIR}/meta-data"
+METADATA="${VM_DIR}/meta-data-${DISTRO}"
 # Unique instance-id per overlay: cloud-init skips once-per-instance modules
 # if it recognises the id from a previous boot of the same overlay.
 INSTANCE_ID="llm-companion-$(date +%s)"
