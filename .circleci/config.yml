@@ -175,11 +175,13 @@ jobs:
 
             def normalize(text):
                 """Strip per-line leading whitespace and blank lines so that
-                YAML-space-indented and tab-indented copies compare equal."""
+                YAML-space-indented and tab-indented copies compare equal.
+                SPDX header lines are present in the standalone canonical file
+                but not in the YAML-embedded ConfigMap copies — skip them."""
                 return "\n".join(
                     line.expandtabs(2).strip()
                     for line in text.splitlines()
-                    if line.strip()
+                    if line.strip() and not line.strip().startswith("# SPDX-")
                 )
 
             canonical = open("Caddyfile").read()
