@@ -395,7 +395,7 @@ if [[ ! -f "${VM_IMAGE}" ]]; then
             step "Downloading Debian ${DEBIAN_VERSION} Cloud Base image (~400 MB)..."
             ;;
     esac
-    if wget --show-progress -O "${VM_IMAGE}.tmp" "${IMAGE_URL}"; then
+    if wget --https-only --show-progress -O "${VM_IMAGE}.tmp" "${IMAGE_URL}"; then
         mv "${VM_IMAGE}.tmp" "${VM_IMAGE}"
     else
         rm -f "${VM_IMAGE}.tmp"
