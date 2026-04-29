@@ -41,13 +41,20 @@ Stack architecture
    │  ┌────────────▼──────┐  ┌──────────┐  │
    │  │  ollama :11434    │  │open-webui│  │
    │  │  (internal)       │  │  :3000   │  │
-   │  └───────────────────┘  └──────────┘  │
+   │  └───────────────────┘  └─────┬────┘  │
+   │                               │       │
+   │                         ┌─────▼────┐  │
+   │                         │ searxng  │  │
+   │                         │  :8888   │  │
+   │                         │(internal)│  │
+   │                         └──────────┘  │
    └───────────────────────────────────────┘
 
-- All three containers share the same **network namespace** (single Pod)
+- All four containers share the same **network namespace** (single Pod)
 - Containers communicate via **localhost**, not DNS names
 - **Caddy** is the only container with a port published to the host (``:8080``)
 - **Open WebUI** runs on port **3000** internally (not 8080, to avoid conflicting with Caddy)
+- **SearXNG** runs on port **8888** internally — used by Open WebUI for web search, never exposed outside the pod
 - **Caddy** enforces a Bearer token on all ``/ollama/api/*`` and ``/ollama/v1/*`` requests
 
 .. warning::
@@ -642,6 +649,12 @@ Useful commands
    # Reload Caddy config without restart (after updating stack.yml ConfigMap)
    podman exec llm-companion-caddy caddy reload --config /etc/caddy/Caddyfile
 
+   # Check SearXNG logs
+   podman logs llm-companion-searxng
+
+   # Test SearXNG directly (from inside the pod network)
+   podman exec llm-companion-searxng wget -qO- 'http://localhost:8888/search?q=test&format=json' | head -c 200
+
    # Test auth
    KEY=$(grep OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -f2-)
    curl -s -H "Authorization: Bearer $KEY" http://localhost:8080/ollama/api/tags
@@ -657,6 +670,21 @@ Useful commands
 
 Troubleshooting
 ---------------
+
+**Web search returns no results in Open WebUI**
+
+Check that SearXNG is running and responding:
+
+.. code-block:: bash
+
+   podman logs llm-companion-searxng
+   podman exec llm-companion-searxng wget -qO- 'http://localhost:8888/search?q=test&format=json' | head -c 200
+
+If SearXNG has not started yet, wait for the readiness probe (10 s initial delay).
+If the JSON response is missing, confirm ``formats: [html, json]`` is present in
+the ``searxng-settings.yml`` key of the ConfigMap in ``stack.yml``.
+
+----
 
 **Caddy fails to start — secrets not found**
 
