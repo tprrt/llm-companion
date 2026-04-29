@@ -27,34 +27,32 @@ Stack architecture
            │
         :8080  ← firewalld / ufw opens only this port
            │
-   ┌───────────────────────────────────────┐
-   │  llm-companion Pod                     │
-   │  (shared network namespace)            │
-   │                                        │
-   │  ┌──────────────────────────────────┐  │
-   │  │  caddy  :8080 (hostPort)         │  │
-   │  │  Bearer token auth on            │  │
-   │  │  /ollama/api/* /ollama/v1/*      │  │
-   │  │  Passes / to Open WebUI          │  │
-   │  └────────────┬─────────────────────┘  │
-   │               │ localhost              │
-   │  ┌────────────▼──────┐  ┌──────────┐  │
-   │  │  ollama :11434    │  │open-webui│  │
-   │  │  (internal)       │  │  :3000   │  │
-   │  └───────────────────┘  └─────┬────┘  │
-   │                               │       │
-   │                         ┌─────▼────┐  │
-   │                         │ searxng  │  │
-   │                         │  :8888   │  │
-   │                         │(internal)│  │
-   │                         └──────────┘  │
-   └───────────────────────────────────────┘
+   ┌────────────────────────────────────────────────────────┐
+   │  llm-companion Pod  (shared network namespace)         │
+   │                                                        │
+   │  ┌──────────────────────────────────────────────────┐  │
+   │  │  caddy  :8080 (hostPort)                         │  │
+   │  │  Bearer token auth on /ollama/api/* /ollama/v1/* │  │
+   │  │  Passes / to Open WebUI                          │  │
+   │  └───────────────────┬──────────────────────────────┘  │
+   │                      │ localhost                       │
+   │  ┌───────────────────▼──┐  ┌───────────────────────┐   │
+   │  │  ollama :11434       │  │  open-webui :3000     │   │
+   │  │  (internal)          │  └────────┬──────────┬───┘   │
+   │  └──────────────────────┘           │          │       │
+   │                              ┌──────▼──┐  ┌────▼──────┐│
+   │                              │ searxng │  │   open-   ││
+   │                              │  :8888  │  │ terminal  ││
+   │                              │(internal│  │  :8000    ││
+   │                              └─────────┘  └───────────┘│
+   └────────────────────────────────────────────────────────┘
 
-- All four containers share the same **network namespace** (single Pod)
+- All five containers share the same **network namespace** (single Pod)
 - Containers communicate via **localhost**, not DNS names
 - **Caddy** is the only container with a port published to the host (``:8080``)
 - **Open WebUI** runs on port **3000** internally (not 8080, to avoid conflicting with Caddy)
 - **SearXNG** runs on port **8888** internally — used by Open WebUI for web search, never exposed outside the pod
+- **Open Terminal** runs on port **8000** internally — gives Open WebUI agents a sandboxed shell, never exposed outside the pod
 - **Caddy** enforces a Bearer token on all ``/ollama/api/*`` and ``/ollama/v1/*`` requests
 
 .. warning::
