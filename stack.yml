@@ -5,12 +5,14 @@
 # stack.yml — Kubernetes Pod manifest for the llm-companion stack
 #
 # Contains (in order):
-#   1. PersistentVolumeClaims (ollama-models, open-webui-data, caddy-data)
-#   2. ConfigMap with the embedded Caddyfile
-#   3. Pod with three containers: ollama, open-webui, caddy
+#   1. PersistentVolumeClaims (ollama-models, open-webui-data,
+#      open-terminal-data, caddy-data)
+#   2. ConfigMap with the embedded Caddyfile and SearXNG settings
+#   3. Pod with five containers: ollama, open-webui, open-terminal, searxng,
+#      caddy
 #
 # Pod mode (single-pod networking):
-#   All three containers share the same network namespace. They communicate
+#   All containers share the same network namespace. They communicate
 #   via localhost (127.0.0.1), not via DNS names.
 #     - Ollama listens on localhost:11434
 #     - Open WebUI listens on localhost:3000  (not 8080 — Caddy owns :8080)
@@ -63,6 +65,20 @@ spec:
   resources:
     requests:
       storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llm-open-terminal-data
+  labels:
+    app: llm-companion
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
 
 ---
 apiVersion: v1
@@ -298,6 +314,45 @@ spec:
         - name: open-webui-data
           mountPath: /app/backend/data
 
+    # ── Open Terminal ────────────────────────────────────────────────────────
+    # Remote shell for Open WebUI agents — internal only, never exposed outside
+    # the pod. Connect via Admin → Connections → Open Terminal in Open WebUI,
+    # using http://localhost:8000 and the key from open-terminal-api-key.env.
+    - name: open-terminal
+      image: ghcr.io/open-webui/open-terminal:0.11.34-slim
+      env:
+        - name: OPEN_TERMINAL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-companion-secrets
+              key: open-terminal-api-key
+      livenessProbe:
+        tcpSocket:
+          port: 8000
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        timeoutSeconds: 5
+      readinessProbe:
+        tcpSocket:
+          port: 8000
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 1000m
+          memory: 512Mi
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: open-terminal-data
+          mountPath: /home/user
+
     # ── SearXNG ──────────────────────────────────────────────────────────────
     # Internal-only metasearch engine used by Open WebUI for web search.
     # Not exposed outside the pod — reachable only on localhost:8888.
@@ -410,6 +465,9 @@ spec:
         items:
           - key: Caddyfile
             path: Caddyfile
+    - name: open-terminal-data
+      persistentVolumeClaim:
+        claimName: llm-open-terminal-data
     # ConfigMap volume: mounts settings.yml into the SearXNG container.
     - name: searxng-config
       configMap:
