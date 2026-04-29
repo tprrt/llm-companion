@@ -2,23 +2,23 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 # =============================================================================
-# Modelfile.qwen3-8b — Qwen3 8B with 16k context and thinking mode disabled
+# Modelfile.qwen3.5-9b — Qwen3.5 9B with 16k context and thinking mode disabled
 #
-# Best agentic model for 8 GB CPU-only host.
+# Best agentic model for 8 GB CPU-only host. Native multimodal (vision built-in).
 # Thinking mode (/no_think) is suppressed via SYSTEM prompt so OpenCode
 # gets clean responses without <think>…</think> blocks in the tool stream.
 #
 # Create with:
-#   podman cp Modelfile.qwen3-8b ollama:/tmp/
-#   podman exec -it ollama ollama create qwen3-8b-16k -f /tmp/Modelfile.qwen3-8b
+#   podman cp Modelfile.qwen3.5-9b ollama:/tmp/
+#   podman exec -it ollama ollama create qwen3.5-9b-16k -f /tmp/Modelfile.qwen3.5-9b
 #
 # pull-models.sh does this automatically.
 # =============================================================================
 
-FROM qwen3:8b
+FROM qwen3.5:9b
 
-# 16k is the practical ceiling for an 8 GB host with a 5 GB model.
-# Leaves ~3 GB for OS + KV cache.
+# 16k is the practical ceiling for an 8 GB host with a ~5.5 GB model.
+# Leaves ~2.5 GB for OS + KV cache.
 PARAMETER num_ctx 16384
 
 # Low temperature for deterministic code / tool responses

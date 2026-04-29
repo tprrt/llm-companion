@@ -387,10 +387,14 @@ fi
 if [[ ! -f "${VM_IMAGE}" ]]; then
     case "${DISTRO}" in
         fedora)
+            [[ -n "${IMAGES_URL:-}" ]] || \
+                die "Image '${VM_IMAGE}' not found and no URL to download from.\nRemove --image to auto-download, or provide a valid local path."
             IMAGE_URL="${IMAGES_URL}/$(basename "${VM_IMAGE}")"
             step "Downloading Fedora ${FEDORA_VERSION} Cloud Base image (~550 MB)..."
             ;;
         debian)
+            [[ -n "${IMAGES_URL:-}" ]] || \
+                die "Image '${VM_IMAGE}' not found and no URL to download from.\nRemove --image to auto-download, or provide a valid local path."
             IMAGE_URL="${IMAGES_URL}/$(basename "${VM_IMAGE}")"
             step "Downloading Debian ${DEBIAN_VERSION} Cloud Base image (~400 MB)..."
             ;;
@@ -469,6 +473,9 @@ echo "$(ts) 9p share mounted at /mnt/llm-companion"
 # ── 2. Copy project files to a writable location ─────────────────────────────
 echo "$(ts) Copying project files..."
 cp -r /mnt/llm-companion /home/fedora/llm-companion
+rm -rf /home/fedora/llm-companion/.??* \
+       /home/fedora/llm-companion/test-vm.sh \
+       /home/fedora/llm-companion/vm-test
 chown -R fedora:fedora /home/fedora/llm-companion
 chmod +x /home/fedora/llm-companion/*.sh
 echo "$(ts) Project files ready at /home/fedora/llm-companion"
@@ -522,6 +529,9 @@ echo "$(ts) 9p share mounted at /mnt/llm-companion"
 # ── 2. Copy project files to a writable location ─────────────────────────────
 echo "$(ts) Copying project files..."
 cp -r /mnt/llm-companion /home/debian/llm-companion
+rm -rf /home/debian/llm-companion/.??* \
+       /home/debian/llm-companion/test-vm.sh \
+       /home/debian/llm-companion/vm-test
 chown -R debian:debian /home/debian/llm-companion
 chmod +x /home/debian/llm-companion/*.sh
 echo "$(ts) Project files ready at /home/debian/llm-companion"
@@ -686,11 +696,13 @@ info "Setup done — VM is rebooting to start llm-companion service."
 sleep 20
 step "Waiting for VM to come back after reboot..."
 until ssh_q true 2>/dev/null; do sleep 5; done
-sleep 15   # give systemd a moment to start the llm-companion service
+step "Waiting for llm-companion service to become active..."
+# shellcheck disable=SC2016  # $(id -u) is intentionally expanded on the remote
+until ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-active llm-companion' 2>/dev/null; do sleep 5; done
 
 # ── Service status ────────────────────────────────────────────────────────────
 info "Checking service status..."
-# shellcheck disable=SC2016  # $(id -u) is intentionally expanded on the remote
+# shellcheck disable=SC2016
 ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status llm-companion --no-pager -l' 2>/dev/null || true
 
 # ── Read back the generated API key ──────────────────────────────────────────

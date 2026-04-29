@@ -190,6 +190,14 @@ spec:
         initialDelaySeconds: 10
         periodSeconds: 30
         timeoutSeconds: 10
+      readinessProbe:
+        exec:
+          command:
+            - ollama
+            - list
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 10
       securityContext:
         # privileged: true is required for rootless Podman to access /dev/kfd
         # and /dev/dri (AMD GPU devices). Without this, ROCm cannot enumerate
@@ -240,6 +248,20 @@ spec:
         initialDelaySeconds: 30
         periodSeconds: 30
         timeoutSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 10
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 2Gi
       volumeMounts:
         - name: open-webui-data
           mountPath: /app/backend/data
@@ -269,6 +291,19 @@ spec:
         initialDelaySeconds: 5
         periodSeconds: 30
         timeoutSeconds: 10
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
       # NOTE: No cap-drop: ALL for Caddy.
       # Caddy has cap_net_bind_service as a file capability in the image.
       # Dropping ALL capabilities in a rootless user namespace causes EPERM
