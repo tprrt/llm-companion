@@ -237,6 +237,21 @@ spec:
           value: "false"
         - name: ENABLE_SIGNUP
           value: "true"
+        # Auto-activate new users instead of leaving them in the pending state.
+        # Safe for a private LAN/VPN deployment.
+        - name: DEFAULT_USER_ROLE
+          value: "user"
+        # Allow generating API keys from the UI (Settings → Account).
+        - name: ENABLE_API_KEYS
+          value: "true"
+        # Use a small dedicated model for background tasks (title generation,
+        # web search query rewriting) so the main chat model is not interrupted.
+        # qwen3-1.7b-4k is always available regardless of hardware tier.
+        - name: TASK_MODEL
+          value: "qwen3-1.7b-4k"
+        # Cache the Ollama model list instead of re-fetching it on every request.
+        - name: ENABLE_BASE_MODELS_CACHE
+          value: "true"
         # Use Ollama for RAG embeddings instead of loading sentence-transformer
         # models locally inside open-webui. Without this, open-webui loads
         # PyTorch ML models into memory at runtime, consuming 1-2 GB that is
