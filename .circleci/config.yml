@@ -78,9 +78,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # hadolint — Dockerfile best-practice linter
-  #
-  # DL3007 (avoid :latest) is ignored because the comments already document
-  # that pinning to a specific version is the operator's responsibility.
   # ---------------------------------------------------------------------------
   hadolint:
     executor: docker-hadolint
@@ -88,7 +85,7 @@ jobs:
       - checkout
       - run:
           name: Lint Dockerfile
-          command: hadolint --ignore DL3007 Dockerfile
+          command: hadolint Dockerfile
 
   # ---------------------------------------------------------------------------
   # caddy-validate — formatting and syntax check for the Caddyfile
