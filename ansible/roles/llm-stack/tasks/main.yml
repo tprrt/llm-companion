@@ -57,7 +57,7 @@
 # ── Read secrets from files ───────────────────────────────────────────────────
 - name: Read Ollama API key
   ansible.builtin.command:
-    cmd: grep OLLAMA_API_KEY {{ ansible_user_dir }}/.config/ollama/api-key.env
+    cmd: grep OLLAMA_API_KEY "{{ ansible_user_dir }}/.config/ollama/api-key.env"
   register: api_key_line
   changed_when: false
 
@@ -67,7 +67,7 @@
 
 - name: Read WebUI secret key
   ansible.builtin.command:
-    cmd: grep WEBUI_SECRET_KEY {{ ansible_user_dir }}/.config/ollama/webui-secret.env
+    cmd: grep WEBUI_SECRET_KEY "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
   register: webui_secret_line
   changed_when: false
 

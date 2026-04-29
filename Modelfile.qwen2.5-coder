@@ -12,7 +12,7 @@
 #   # Then reference it in opencode.json as: ollama/qwen2.5-coder:7b-16k
 #
 # Or interactively:
-#   podman exec -it ollama ollama run qwen2.5-coder:7b
+#   podman exec -it llm-companion-ollama ollama run qwen2.5-coder:7b
 #   >>> /set parameter num_ctx 16384
 #   >>> /save qwen2.5-coder:7b-16k
 #   >>> /bye

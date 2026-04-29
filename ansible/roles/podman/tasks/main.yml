@@ -57,11 +57,18 @@
   when: ansible_os_family == "Debian"
 
 # ── SELinux boolean (RedHat only) ─────────────────────────────────────────────
+- name: Check SELinux boolean container_manage_cgroup (RedHat)
+  ansible.builtin.command:
+    cmd: getsebool container_manage_cgroup
+  when: ansible_os_family == "RedHat"
+  register: podman_sebool_check
+  changed_when: false
+
 - name: Enable SELinux boolean container_manage_cgroup (RedHat)
   ansible.builtin.command:
     cmd: setsebool -P container_manage_cgroup on
   become: true
-  when: ansible_os_family == "RedHat"
+  when: ansible_os_family == "RedHat" and 'on' not in podman_sebool_check.stdout
   changed_when: true
 
 # ── Podman user socket ────────────────────────────────────────────────────────
