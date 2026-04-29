@@ -140,6 +140,22 @@ data:
       }
     }
 
+  searxng-settings.yml: |
+    use_default_settings: true
+
+    server:
+      # Static secret — SearXNG is only reachable on localhost within the pod,
+      # never exposed outside.
+      secret_key: "llm-companion-searxng-local-only"
+      limiter: false
+      image_proxy: false
+
+    search:
+      safe_search: 0
+      formats:
+        - html
+        - json
+
 ---
 apiVersion: v1
 kind: Pod
@@ -235,6 +251,13 @@ spec:
         # `ollama pull nomic-embed-text`). Until then, RAG is simply inactive.
         - name: RAG_EMBEDDING_ENGINE
           value: "ollama"
+        # Web search via SearXNG sidecar (localhost:8888 — shared pod network).
+        - name: ENABLE_RAG_WEB_SEARCH
+          value: "true"
+        - name: RAG_WEB_SEARCH_ENGINE
+          value: "searxng"
+        - name: SEARXNG_QUERY_URL
+          value: "http://localhost:8888/search?q=<query>&format=json"
         # Secret key for session signing — read from the Kubernetes Secret.
         - name: WEBUI_SECRET_KEY
           valueFrom:
@@ -265,6 +288,50 @@ spec:
       volumeMounts:
         - name: open-webui-data
           mountPath: /app/backend/data
+
+    # ── SearXNG ──────────────────────────────────────────────────────────────
+    # Internal-only metasearch engine used by Open WebUI for web search.
+    # Not exposed outside the pod — reachable only on localhost:8888.
+    - name: searxng
+      image: docker.io/searxng/searxng:2026.4.17-e8299a4c3
+      env:
+        # Bind on port 8888 to avoid conflicting with Caddy's :8080.
+        - name: SEARXNG_PORT
+          value: "8888"
+        # Skip ownership enforcement — running rootless with keep-id mapping.
+        - name: FORCE_OWNERSHIP
+          value: "false"
+        - name: INSTANCE_NAME
+          value: "llm-companion"
+      livenessProbe:
+        tcpSocket:
+          port: 8888
+        initialDelaySeconds: 10
+        periodSeconds: 30
+        timeoutSeconds: 5
+      readinessProbe:
+        tcpSocket:
+          port: 8888
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: searxng-config
+          mountPath: /etc/searxng/
+          readOnly: true
+        - name: searxng-cache
+          mountPath: /var/cache/searxng/
 
     # ── Caddy ────────────────────────────────────────────────────────────────
     - name: caddy
@@ -334,3 +401,13 @@ spec:
         items:
           - key: Caddyfile
             path: Caddyfile
+    # ConfigMap volume: mounts settings.yml into the SearXNG container.
+    - name: searxng-config
+      configMap:
+        name: llm-companion-config
+        items:
+          - key: searxng-settings.yml
+            path: settings.yml
+    # Ephemeral cache for SearXNG — no persistence needed across restarts.
+    - name: searxng-cache
+      emptyDir: {}
