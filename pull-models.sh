@@ -301,7 +301,7 @@ echo ""
 pull_and_configure() {
     local model="$1" ctx="$2" extra="${3:-}"
     local variant
-    variant="${model/:/-}-$(awk "BEGIN {printf \"%dk\", ${ctx}/1024}")"
+    variant="${model/:/-}-$(( ctx / 1024 ))k"
 
     info "Pulling ${model}..."
     # Use -t only when running in a terminal (avoids TTY errors when scripted).

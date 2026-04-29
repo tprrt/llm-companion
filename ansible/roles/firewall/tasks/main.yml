@@ -47,18 +47,28 @@
     cmd: ufw allow 22/tcp
   become: true
   when: ansible_os_family == "Debian"
-  changed_when: true
+  register: ufw_allow_ssh
+  changed_when: "'Rules updated' in ufw_allow_ssh.stdout"
 
 - name: Allow web port through ufw (Debian)
   ansible.builtin.command:
     cmd: ufw allow {{ llm_web_port }}/tcp
   become: true
   when: ansible_os_family == "Debian"
-  changed_when: true
+  register: ufw_allow_web
+  changed_when: "'Rules updated' in ufw_allow_web.stdout"
+
+- name: Check ufw status (Debian)
+  ansible.builtin.command:
+    cmd: ufw status
+  become: true
+  when: ansible_os_family == "Debian"
+  register: ufw_status_check
+  changed_when: false
 
 - name: Enable ufw (Debian)
   ansible.builtin.command:
     cmd: ufw --force enable
   become: true
-  when: ansible_os_family == "Debian"
+  when: "ansible_os_family == 'Debian' and 'Status: active' not in ufw_status_check.stdout"
   changed_when: true
