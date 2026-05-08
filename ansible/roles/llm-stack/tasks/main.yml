@@ -137,9 +137,15 @@
     daemon_reload: true
     scope: user
 
-- name: Enable and start llm-companion Quadlet service
+- name: Enable llm-companion Quadlet service
   ansible.builtin.systemd:
     name: llm-companion
     scope: user
-    state: started
+    # Do not start here: cloud-init reboots immediately after this playbook runs.
+    # Starting now lets Open WebUI begin SQLite migrations, which auto-commit
+    # each ALTER TABLE statement individually.  If the reboot kills the process
+    # mid-migration the partial schema changes persist but alembic_version rolls
+    # back, causing every subsequent startup to fail on "duplicate column".
+    # Enabling without starting means the service starts cleanly on the first
+    # post-reboot boot and migrations complete uninterrupted.
     enabled: true
