@@ -18,6 +18,7 @@
 #   status    Show whether the VM is running and its connection info
 #   logs      Stream the VM console log (tail -f)
 #   console   Open an SSH session into the running VM
+#   check     Check that all services are up and healthy (requires running VM)
 #
 # Options (start only, except --distro which also applies to clean/mrproper):
 #   --distro DISTRO   Target distribution: fedora or debian  (default: fedora)
@@ -79,12 +80,12 @@ SUBCMD="${1:-start}"
 shift || true
 
 case "${SUBCMD}" in
-    start|stop|clean|mrproper|status|logs|console) ;;
+    start|stop|clean|mrproper|status|logs|console|check) ;;
     --help|-h)
         sed -n '/^# Usage:/,/^# =/{ /^# =/d; s/^# \{0,1\}//; p }' "$0"
         exit 0
         ;;
-    *) echo "Unknown subcommand: ${SUBCMD}. Use: start stop clean mrproper status logs console"; exit 1 ;;
+    *) echo "Unknown subcommand: ${SUBCMD}. Use: start stop clean mrproper status logs console check"; exit 1 ;;
 esac
 
 # ── Options ───────────────────────────────────────────────────────────────────
@@ -176,6 +177,13 @@ ssh_q() {
     # shellcheck disable=SC2086,SC2029
     # 127.0.0.1 (not localhost) to avoid IPv6 — QEMU user-net only binds IPv4.
     ssh ${opts} "${VM_USER}@127.0.0.1" "$@"
+}
+
+# ── check_services — run the installed check-services.sh on the target via SSH ─
+check_services() {
+    vm_is_running || die "VM is not running."
+    step "Service health checks (via SSH)..."
+    ssh_q ~/.local/bin/check-services.sh
 }
 
 # ── stop ──────────────────────────────────────────────────────────────────────
@@ -331,6 +339,12 @@ if [[ "${SUBCMD}" == "console" ]]; then
     [[ -f "${VM_SSH_KEY}" ]] && SSH_OPTS="${SSH_OPTS} -i ${VM_SSH_KEY}"
     # shellcheck disable=SC2086
     exec ssh ${SSH_OPTS} "${VM_USER}@127.0.0.1"
+fi
+
+# ── check ─────────────────────────────────────────────────────────────────────
+if [[ "${SUBCMD}" == "check" ]]; then
+    check_services
+    exit $?
 fi
 
 # ── start ─────────────────────────────────────────────────────────────────────
@@ -704,6 +718,8 @@ until ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-active llm-c
 info "Checking service status..."
 # shellcheck disable=SC2016
 ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status llm-companion --no-pager -l' 2>/dev/null || true
+
+check_services || true
 
 # ── Read back the generated API key ──────────────────────────────────────────
 API_KEY=$(ssh_q 'grep OLLAMA_API_KEY ~/.config/ollama/api-key.env 2>/dev/null | cut -d= -f2-' 2>/dev/null \
