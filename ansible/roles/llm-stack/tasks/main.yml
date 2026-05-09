@@ -6,21 +6,21 @@
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/.local/bin"
     state: directory
-    mode: "0755"
+    mode: "0755" # NOSONAR — standard mode for a user bin directory; rootless single-user host
 
 - name: Install check-services.sh to ~/.local/bin/
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/check-services.sh"
     dest: "{{ ansible_user_dir }}/.local/bin/check-services.sh"
     remote_src: true
-    mode: "0755"
+    mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 - name: Install pull-models.sh to ~/.local/bin/
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/pull-models.sh"
     dest: "{{ ansible_user_dir }}/.local/bin/pull-models.sh"
     remote_src: true
-    mode: "0755"
+    mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 # ── Copy stack manifest ───────────────────────────────────────────────────────
 # For ROCm builds, stack-rocm.yml is used as the source (it references
