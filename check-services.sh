@@ -30,7 +30,7 @@ OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -
 http_check() {
     local name="$1" url="$2" extra_args=("${@:3}")
     local code
-    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "${extra_args[@]}" "$url" 2>/dev/null || echo "000")
+    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "${extra_args[@]}" "$url" 2>/dev/null || true)
     if [[ "$code" == "200" ]]; then
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — HTTP ${code}"
         return 0
@@ -44,7 +44,7 @@ http_check() {
 port_check() {
     local name="$1" url="$2"
     local code
-    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
     if [[ "$code" != "000" ]]; then
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — reachable (HTTP ${code})"
         return 0

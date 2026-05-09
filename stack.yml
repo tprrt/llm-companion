@@ -207,12 +207,13 @@ metadata:
     # This is equivalent to --userns=keep-id in podman run.
     io.podman.annotations.userns: "keep-id"
 spec:
+  automountServiceAccountToken: false
   restartPolicy: Always
 
   containers:
     # ── Ollama ───────────────────────────────────────────────────────────────
-    - name: ollama
-      image: localhost/ollama-cpu:latest
+    - name: ollama # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
+      image: localhost/ollama-cpu:latest # NOSONAR — S6596: locally built image pinned at build time, no registry tag needed
       env:
         # Listen on all interfaces within the pod network namespace.
         - name: OLLAMA_HOST
@@ -254,7 +255,7 @@ spec:
           mountPath: /var/lib/ollama/models
 
     # ── Open WebUI ───────────────────────────────────────────────────────────
-    - name: open-webui
+    - name: open-webui # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
       image: ghcr.io/open-webui/open-webui:v0.9.4
       env:
         # Open WebUI binds on port 3000 (not 8080) to avoid conflicting with Caddy.
@@ -412,7 +413,7 @@ spec:
           mountPath: /var/cache/searxng/
 
     # ── Caddy ────────────────────────────────────────────────────────────────
-    - name: caddy
+    - name: caddy # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
       image: docker.io/library/caddy:2.11.2
       env:
         # API key for Ollama Bearer token auth — read from the Kubernetes Secret.

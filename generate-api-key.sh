@@ -57,7 +57,7 @@ echo '  "provider": {'
 echo '    "ollama": {'
 echo '      "npm": "@ai-sdk/openai-compatible",'
 echo '      "options": {'
-echo '        "baseURL": "http://<server-ip>:8080/v1",'
+echo '        "baseURL": "http://<server-ip>:8080/v1",' # NOSONAR — placeholder URL in printed usage example; no real HTTP connection is made
 echo '        "headers": {'
 echo '          "Authorization": "Bearer '"${KEY}"'"'
 echo '        }'
