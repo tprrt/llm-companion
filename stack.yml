@@ -147,6 +147,19 @@ data:
         }
       }
 
+      # ── SearXNG — web search (no auth — LAN/VPN access only) ──────────
+      # Clients: use http://<host>:8080/searxng/
+      @searxng {
+        path /searxng /searxng/*
+      }
+
+      handle @searxng {
+        uri strip_prefix /searxng
+        reverse_proxy localhost:8888 {
+          header_up X-Real-IP {remote_host}
+        }
+      }
+
       # ── Open WebUI — no extra auth (has its own account system) ────────
       # Open WebUI runs on port 3000 (not 8080) to avoid conflicting with Caddy.
       handle {
@@ -167,8 +180,6 @@ data:
     use_default_settings: true
 
     server:
-      # Static secret — SearXNG is only reachable on localhost within the pod,
-      # never exposed outside.
       secret_key: "llm-companion-searxng-local-only"
       limiter: false
       image_proxy: false
