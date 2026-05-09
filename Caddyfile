@@ -43,7 +43,7 @@
 		}
 	}
 
-	# ── SearXNG — web search (no auth — LAN/VPN access only) ──────────
+	# ── SearXNG — Bearer token protected ──────────────────────────────
 	# Clients: use http://<host>:8080/searxng/
 	@searxng {
 		path /searxng /searxng/*
