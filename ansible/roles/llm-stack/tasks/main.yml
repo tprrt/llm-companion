@@ -1,6 +1,20 @@
 # SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
 # SPDX-License-Identifier: GPL-3.0-only
 ---
+# ── Install helper scripts ────────────────────────────────────────────────────
+- name: Create ~/.local/bin directory
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/.local/bin"
+    state: directory
+    mode: "0755"
+
+- name: Install check-services.sh to ~/.local/bin/
+  ansible.builtin.copy:
+    src: "{{ llm_project_dir }}/check-services.sh"
+    dest: "{{ ansible_user_dir }}/.local/bin/check-services.sh"
+    remote_src: true
+    mode: "0755"
+
 # ── Copy stack manifest ───────────────────────────────────────────────────────
 # For ROCm builds, stack-rocm.yml is used as the source (it references
 # localhost/ollama-rocm:latest and enables privileged GPU access).
