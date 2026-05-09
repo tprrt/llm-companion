@@ -9,6 +9,11 @@ llm_web_port: 8080
 # Ansible copies stack.yml from here. The Dockerfile must also be here.
 llm_project_dir: "{{ ansible_user_dir }}/llm-companion"
 
+# ── Model pulling ────────────────────────────────────────────────────────────
+# Set to true to have Ansible start the stack and pull models automatically.
+# Requires the service to be startable (i.e. not a cloud-init first-boot run).
+llm_pull_models: false
+
 # ── Ollama build ──────────────────────────────────────────────────────────────
 # Build target: 'cpu' or 'rocm'
 ollama_build_target: cpu
