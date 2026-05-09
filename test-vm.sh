@@ -588,7 +588,7 @@ USERDATA="${VM_DIR}/user-data-${DISTRO}"
 SETUP_B64=$(base64 -w0 "${SETUP_SCRIPT}")
 
 # Fedora uses the 'wheel' group for sudo; Debian uses 'sudo'.
-[[ "${DISTRO}" == "fedora" ]] && VM_GROUPS="wheel" || VM_GROUPS="sudo"
+[[ "${DISTRO}" == "fedora" ]] && VM_GROUPS="wheel" || VM_GROUPS="sudo" # NOSONAR — distro name and sudo group are distinct concepts; no single constant fits both
 
 cat > "${USERDATA}" << YAML
 #cloud-config

@@ -332,7 +332,7 @@ spec:
     # Remote shell for Open WebUI agents — internal only, never exposed outside
     # the pod. Connect via Admin → Connections → Open Terminal in Open WebUI,
     # using http://localhost:8000 and the key from open-terminal-api-key.env.
-    - name: open-terminal
+    - name: open-terminal # NOSONAR — storage limits inapplicable to podman play kube
       image: ghcr.io/open-webui/open-terminal:0.11.34-slim
       env:
         - name: OPEN_TERMINAL_API_KEY
@@ -370,7 +370,7 @@ spec:
     # ── SearXNG ──────────────────────────────────────────────────────────────
     # Internal-only metasearch engine used by Open WebUI for web search.
     # Not exposed outside the pod — reachable only on localhost:8888.
-    - name: searxng
+    - name: searxng # NOSONAR — storage limits inapplicable to podman play kube
       image: docker.io/searxng/searxng:2026.4.17-e8299a4c3
       env:
         # Bind on port 8888 to avoid conflicting with Caddy's :8080.
