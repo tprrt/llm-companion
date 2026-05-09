@@ -367,7 +367,7 @@ SSH into the VM and run the pull script directly:
 .. code-block:: bash
 
    ./test-vm.sh console
-   ./llm-companion/pull-models.sh
+   pull-models.sh
 
 Tear down
 ~~~~~~~~~
@@ -720,7 +720,7 @@ SSH into the VM and run the pull script directly:
 .. code-block:: bash
 
    ./test-vm.sh console
-   ./llm-companion/pull-models.sh
+   pull-models.sh
 
 **``systemctl --user`` fails over SSH ("Failed to connect to bus")**
 

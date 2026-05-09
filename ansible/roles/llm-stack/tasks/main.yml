@@ -15,6 +15,13 @@
     remote_src: true
     mode: "0755"
 
+- name: Install pull-models.sh to ~/.local/bin/
+  ansible.builtin.copy:
+    src: "{{ llm_project_dir }}/pull-models.sh"
+    dest: "{{ ansible_user_dir }}/.local/bin/pull-models.sh"
+    remote_src: true
+    mode: "0755"
+
 # ── Copy stack manifest ───────────────────────────────────────────────────────
 # For ROCm builds, stack-rocm.yml is used as the source (it references
 # localhost/ollama-rocm:latest and enables privileged GPU access).
@@ -163,3 +170,30 @@
     # Enabling without starting means the service starts cleanly on the first
     # post-reboot boot and migrations complete uninterrupted.
     enabled: true
+
+# ── Pull models (optional) ────────────────────────────────────────────────────
+# Only runs when llm_pull_models: true. Skip on cloud-init first-boot runs
+# (reboot would interrupt a multi-GB download). Safe to use on subsequent
+# re-provisioning runs where the reboot is deferred or not needed.
+- name: Pull Ollama models
+  when: llm_pull_models | default(false)
+  block:
+    - name: Start llm-companion service
+      ansible.builtin.systemd:
+        name: llm-companion
+        scope: user
+        state: started
+
+    - name: Wait for Ollama to be ready
+      ansible.builtin.uri:
+        url: "http://localhost:11434/"
+        status_code: 200
+      register: ollama_ready
+      retries: 30
+      delay: 5
+      until: ollama_ready.status == 200
+
+    - name: Run pull-models.sh
+      ansible.builtin.command:
+        cmd: "{{ ansible_user_dir }}/.local/bin/pull-models.sh --yes"
+      changed_when: true
