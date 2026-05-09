@@ -33,7 +33,7 @@ Stack architecture
    │  ┌──────────────────────────────────────────────────┐  │
    │  │  caddy  :8080 (hostPort)                         │  │
    │  │  Bearer token auth on /ollama/api/* /ollama/v1/* │  │
-   │  │  Passes /searxng/* to SearXNG (no auth)          │  │
+   │  │  Passes /searxng/* to SearXNG (Bearer token)      │  │
    │  │  Passes / to Open WebUI                          │  │
    │  └───────────────────┬──────────────────────────────┘  │
    │                      │ localhost                       │
@@ -52,9 +52,9 @@ Stack architecture
 - Containers communicate via **localhost**, not DNS names
 - **Caddy** is the only container with a port published to the host (``:8080``)
 - **Open WebUI** runs on port **3000** internally (not 8080, to avoid conflicting with Caddy)
-- **SearXNG** runs on port **8888** internally — used by Open WebUI for web search; also reachable externally at ``:8080/searxng/`` via Caddy (no auth)
+- **SearXNG** runs on port **8888** internally — used by Open WebUI for web search; also reachable externally at ``:8080/searxng/`` via Caddy (same Bearer token as the Ollama API)
 - **Open Terminal** runs on port **8000** internally — gives Open WebUI agents a sandboxed shell, never exposed outside the pod
-- **Caddy** enforces a Bearer token on all ``/ollama/api/*`` and ``/ollama/v1/*`` requests
+- **Caddy** enforces a Bearer token on ``/ollama/api/*``, ``/ollama/v1/*``, and ``/searxng/*``
 
 .. warning::
 
@@ -473,8 +473,9 @@ Step 4 — Verify the proxy
    curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
    # Expected: 200
 
-   # SearXNG (no auth)
-   curl -s 'http://localhost:8080/searxng/search?q=test&format=json' | python3 -m json.tool
+   # SearXNG (same Bearer token as Ollama)
+   curl -s -H "Authorization: Bearer $KEY" \
+       'http://localhost:8080/searxng/search?q=test&format=json' | python3 -m json.tool
 
 Step 5 — Configure OpenCode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -659,8 +660,10 @@ Useful commands
    # Test SearXNG directly (from inside the pod network)
    podman exec llm-companion-searxng wget -qO- 'http://localhost:8888/search?q=test&format=json' | head -c 200
 
-   # Test SearXNG via Caddy proxy
-   curl -s 'http://localhost:8080/searxng/search?q=test&format=json' | head -c 200
+   # Test SearXNG via Caddy proxy (Bearer token required)
+   KEY=$(grep OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -f2-)
+   curl -s -H "Authorization: Bearer $KEY" \
+       'http://localhost:8080/searxng/search?q=test&format=json' | head -c 200
 
    # Test auth
    KEY=$(grep OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -f2-)

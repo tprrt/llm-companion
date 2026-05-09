@@ -24,11 +24,13 @@ set -uo pipefail
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 
+OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -f2- || true)
+
 # http_check: pass only on HTTP 200; any other code (000 = no connection) is a failure.
 http_check() {
-    local name="$1" url="$2"
+    local name="$1" url="$2" extra_args=("${@:3}")
     local code
-    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "${extra_args[@]}" "$url" 2>/dev/null || echo "000")
     if [[ "$code" == "200" ]]; then
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — HTTP ${code}"
         return 0
@@ -58,5 +60,6 @@ http_check "Open WebUI (localhost:3000)"    "http://localhost:3000/health" || rc
 port_check "Open Terminal (localhost:8000)" "http://localhost:8000/"       || rc=1
 http_check "SearXNG (localhost:8888)"       "http://localhost:8888/"          || rc=1
 http_check "Caddy (localhost:8080)"         "http://localhost:8080/health"    || rc=1
-http_check "Caddy/SearXNG (:8080/searxng)"  "http://localhost:8080/searxng/"  || rc=1
+http_check "Caddy/SearXNG (:8080/searxng)"  "http://localhost:8080/searxng/" \
+    -H "Authorization: Bearer ${OLLAMA_API_KEY}"  || rc=1
 exit "$rc"
