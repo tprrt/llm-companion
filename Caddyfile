@@ -22,7 +22,7 @@
 	# Prefixed with /ollama/ to avoid conflicting with Open WebUI's own /api/.
 	# Clients: use http://<host>:8080/ollama/api/ and /ollama/v1/
 	@ollama_api {
-		path /ollama/api/* /ollama/v1/*
+		path /ollama/api /ollama/api/* /ollama/v1 /ollama/v1/*
 	}
 
 	handle @ollama_api {
