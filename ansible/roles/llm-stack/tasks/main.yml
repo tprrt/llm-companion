@@ -31,7 +31,7 @@
     src: "{{ llm_project_dir }}/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
     dest: "{{ ansible_user_dir }}/.config/containers/systemd/stack.yml"
     remote_src: true
-    mode: "0644"
+    mode: "0644" # NOSONAR — non-sensitive stack manifest; world-readable is intentional
 
 # ── Generate Ollama API key ───────────────────────────────────────────────────
 - name: Check if Ollama API key file exists
@@ -151,7 +151,7 @@
     src: "{{ llm_project_dir }}/llm-companion.kube"
     dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion.kube"
     remote_src: true
-    mode: "0644"
+    mode: "0644" # NOSONAR — non-sensitive Quadlet unit file; world-readable is intentional
 
 - name: Reload systemd user daemon
   ansible.builtin.systemd:

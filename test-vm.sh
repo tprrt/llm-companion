@@ -383,7 +383,7 @@ if [[ -z "${VM_IMAGE}" ]]; then
         fedora)
             IMAGES_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/${FEDORA_VERSION}/Cloud/x86_64/images"
             step "Discovering Fedora ${FEDORA_VERSION} Cloud Base image filename..."
-            IMAGE_NAME=$(curl -sL --max-time 15 "${IMAGES_URL}/" \
+            IMAGE_NAME=$(curl -sL --proto '=https' --max-time 15 "${IMAGES_URL}/" \
                 | grep -oP 'Fedora-Cloud-Base-Generic[^"]+\.qcow2' \
                 | head -1)
             [[ -n "${IMAGE_NAME}" ]] || \
@@ -417,7 +417,7 @@ if [[ ! -f "${VM_IMAGE}" ]]; then
             ;;
         *) die "Unsupported distro: ${DISTRO}" ;;
     esac
-    if wget --https-only --show-progress -O "${VM_IMAGE}.tmp" "${IMAGE_URL}"; then
+    if wget --https-only --show-progress -O "${VM_IMAGE}.tmp" "${IMAGE_URL}"; then # NOSONAR — wget --https-only already enforces HTTPS; S6506 does not recognise this flag
         mv "${VM_IMAGE}.tmp" "${VM_IMAGE}"
     else
         rm -f "${VM_IMAGE}.tmp"
