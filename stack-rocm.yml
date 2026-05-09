@@ -145,9 +145,14 @@ data:
       }
 
       handle @searxng {
+        # Reject requests without the correct Bearer token.
+        @unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
+        respond @unauthorized "Unauthorized" 401
+
         uri strip_prefix /searxng
         reverse_proxy localhost:8888 {
           header_up X-Real-IP {remote_host}
+          header_up -Authorization
         }
       }
 
