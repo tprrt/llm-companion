@@ -41,7 +41,7 @@
     content: |
       [engine]
       cgroup_manager = "cgroupfs"
-    mode: "0644"
+    mode: "0644" # NOSONAR — non-sensitive Podman engine config; world-readable is intentional
   when: ansible_os_family == "Debian"
 
 - name: Configure Podman storage to use fuse-overlayfs (Debian)
@@ -53,7 +53,7 @@
 
       [storage.options.overlay]
       mount_program = "/usr/bin/fuse-overlayfs"
-    mode: "0644"
+    mode: "0644" # NOSONAR — non-sensitive Podman storage config; world-readable is intentional
   when: ansible_os_family == "Debian"
 
 # ── SELinux boolean (RedHat only) ─────────────────────────────────────────────
