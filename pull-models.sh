@@ -13,6 +13,7 @@
 #   ./pull-models.sh --all        # all models that fit the hardware
 #   ./pull-models.sh --list       # dry run — show what would be pulled
 #   ./pull-models.sh --reserve N  # reserve N GB RAM (OS + stack + context, default: 2)
+#   ./pull-models.sh --yes        # skip the confirmation prompt (non-interactive)
 #
 # Categories:
 #   coding  — agentic tool use, multi-file edits, OpenCode sessions
@@ -34,12 +35,14 @@ CONTAINER_NAME="llm-companion-ollama"
 RESERVE_GB=2
 MODE="best"     # "best" | "all"
 LIST_ONLY=false
+CONFIRM_YES=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --all)     MODE="all";        shift ;;
-        --list)    LIST_ONLY=true;    shift ;;
-        --reserve) RESERVE_GB="$2";  shift 2 ;;
+        --all)        MODE="all";        shift ;;
+        --list)       LIST_ONLY=true;    shift ;;
+        --reserve)    RESERVE_GB="$2";  shift 2 ;;
+        --yes|-y)     CONFIRM_YES=true;  shift ;;
         *) die "Unknown argument: $1" ;;
     esac
 done
@@ -294,9 +297,11 @@ $LIST_ONLY && exit 0
 }
 
 # ── Confirm ───────────────────────────────────────────────────────────────────
-echo -n "Proceed? [y/N] "
-read -r confirm
-[[ "${confirm,,}" == "y" ]] || { info "Aborted."; exit 0; }
+if ! $CONFIRM_YES; then
+    echo -n "Proceed? [y/N] "
+    read -r confirm
+    [[ "${confirm,,}" == "y" ]] || { info "Aborted."; exit 0; }
+fi
 echo ""
 
 # ── Pull helper ───────────────────────────────────────────────────────────────

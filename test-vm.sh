@@ -56,7 +56,7 @@
 #
 # NOTE: No models are pulled by default. To pull models in the VM:
 #         ./test-vm.sh console
-#         ./llm-companion/pull-models.sh
+#         pull-models.sh
 # =============================================================================
 
 set -euo pipefail
@@ -745,5 +745,5 @@ echo "  Clean:        ./test-vm.sh clean [--distro ${DISTRO}]  (keeps downloaded
 echo "  Mr. Proper:   ./test-vm.sh mrproper [--distro ${DISTRO}]"
 echo ""
 echo "  Pull models:  ./test-vm.sh console"
-echo "                  ./llm-companion/pull-models.sh"
+echo "                  pull-models.sh"
 echo ""
