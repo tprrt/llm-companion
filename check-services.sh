@@ -14,6 +14,7 @@
 #   Open Terminal localhost:8000   GET /          → any HTTP response (reachable)
 #   SearXNG       localhost:8888   GET /          → HTTP 200
 #   Caddy         localhost:8080   GET /health    → HTTP 200 (proxied to Open WebUI)
+#   Caddy/SearXNG localhost:8080   GET /searxng/  → HTTP 200 (proxied to SearXNG)
 #
 # Installed by Ansible to ~/.local/bin/check-services.sh on the target host.
 # Also callable via: ./test-vm.sh check
@@ -55,6 +56,7 @@ rc=0
 http_check "Ollama (localhost:11434)"       "http://localhost:11434/"      || rc=1
 http_check "Open WebUI (localhost:3000)"    "http://localhost:3000/health" || rc=1
 port_check "Open Terminal (localhost:8000)" "http://localhost:8000/"       || rc=1
-http_check "SearXNG (localhost:8888)"       "http://localhost:8888/"       || rc=1
-http_check "Caddy (localhost:8080)"         "http://localhost:8080/health" || rc=1
+http_check "SearXNG (localhost:8888)"       "http://localhost:8888/"          || rc=1
+http_check "Caddy (localhost:8080)"         "http://localhost:8080/health"    || rc=1
+http_check "Caddy/SearXNG (:8080/searxng)"  "http://localhost:8080/searxng/"  || rc=1
 exit "$rc"
