@@ -5,7 +5,7 @@
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/.config/containers/systemd"
     state: directory
-    mode: "0755"
+    mode: "0755" # NOSONAR — non-sensitive container systemd directory; world-readable is intentional
 
 - name: Create ~/.config/ollama directory
   ansible.builtin.file:
@@ -17,7 +17,7 @@
   ansible.builtin.file:
     path: "{{ ansible_user_dir }}/ollama-models"
     state: directory
-    mode: "0755"
+    mode: "0755" # NOSONAR — model storage directory; world-readable is intentional for rootless Podman access
 
 - name: Check SELinux label on ollama-models directory (RedHat only)
   ansible.builtin.command:
