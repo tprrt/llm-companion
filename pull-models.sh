@@ -184,6 +184,7 @@ model_fits() {
             [[ "$ACCEL" == "cuda" && "$VRAM_GB" -ge "$min_vram" ]] || return 1 ;;
         any_gpu)
             [[ "$ACCEL" != "cpu" && "$VRAM_GB" -ge "$min_vram" ]] || return 1 ;;
+        *) return 1 ;;
     esac
     return 0
 }
@@ -211,6 +212,7 @@ get_skip_reason() {
                 || { echo "need GPU (ROCm or CUDA)"; return; }
             [[ "$VRAM_GB" -ge "$min_vram" ]] \
                 || { echo "need ${min_vram} GB VRAM, have ${VRAM_GB} GB"; return; } ;;
+        *) echo "unknown accel: ${accel}" ;;
     esac
 }
 

@@ -28,7 +28,7 @@ ARG HOST_GID=1000
 # Use a distribution-neutral path for models; the Quadlet sets OLLAMA_MODELS
 # to the same path so Ollama finds it regardless of the image's default HOME.
 RUN mkdir -p /var/lib/ollama/models \
-    && chown -R ${HOST_UID}:${HOST_GID} /var/lib/ollama
+    && chown -R "${HOST_UID}":"${HOST_GID}" /var/lib/ollama
 
 # Bind-mount target inside the container.
 # The host path is mounted here at runtime (see the Quadlet file).
@@ -66,7 +66,7 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 
 RUN mkdir -p /var/lib/ollama/models \
-    && chown -R ${HOST_UID}:${HOST_GID} /var/lib/ollama
+    && chown -R "${HOST_UID}":"${HOST_GID}" /var/lib/ollama
 
 VOLUME ["/var/lib/ollama/models"]
 

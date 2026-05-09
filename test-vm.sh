@@ -220,6 +220,7 @@ distro_has_base_image() {
     case "${d}" in
         fedora) compgen -G "${VM_DIR}/Fedora-Cloud-Base-*.qcow2" > /dev/null 2>&1 ;;
         debian) compgen -G "${VM_DIR}/debian-*.qcow2" > /dev/null 2>&1 ;;
+        *) ;;
     esac
 }
 
@@ -229,6 +230,7 @@ delete_base_image() {
     case "${d}" in
         fedora) rm -f "${VM_DIR}"/Fedora-Cloud-Base-*.qcow2 ;;
         debian) rm -f "${VM_DIR}"/debian-*.qcow2 ;;
+        *) ;;
     esac
 }
 
@@ -395,6 +397,7 @@ if [[ -z "${VM_IMAGE}" ]]; then
             info "Using Debian ${DEBIAN_VERSION} Cloud image: ${IMAGE_NAME}"
             VM_IMAGE="${VM_DIR}/${IMAGE_NAME}"
             ;;
+        *) die "Unsupported distro: ${DISTRO}" ;;
     esac
 fi
 
@@ -412,6 +415,7 @@ if [[ ! -f "${VM_IMAGE}" ]]; then
             IMAGE_URL="${IMAGES_URL}/$(basename "${VM_IMAGE}")"
             step "Downloading Debian ${DEBIAN_VERSION} Cloud Base image (~400 MB)..."
             ;;
+        *) die "Unsupported distro: ${DISTRO}" ;;
     esac
     if wget --https-only --show-progress -O "${VM_IMAGE}.tmp" "${IMAGE_URL}"; then
         mv "${VM_IMAGE}.tmp" "${VM_IMAGE}"
@@ -641,6 +645,7 @@ case "${ISO_TOOL}" in
         xorriso -as mkisofs -output "${SEED_ISO}" -volid cidata -joliet -rock \
             -graft-points \
             "user-data=${USERDATA}" "meta-data=${METADATA}" 2>/dev/null ;;
+    *) die "No supported ISO tool found (tried genisoimage, mkisofs, xorriso)." ;;
 esac
 
 fi # end: seed ISO creation (skipped on stop+start)
