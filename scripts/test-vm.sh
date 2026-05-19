@@ -62,9 +62,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
-VM_DIR="${SCRIPT_DIR}/vm-test"
+VM_DIR="${PROJECT_DIR}/vm-test"
 RAM_GB=8
 CPUS=4
 DISK_GB=40
@@ -492,10 +493,10 @@ echo "$(ts) 9p share mounted at /mnt/llm-companion"
 echo "$(ts) Copying project files..."
 cp -r /mnt/llm-companion /home/fedora/llm-companion
 rm -rf /home/fedora/llm-companion/.??* \
-       /home/fedora/llm-companion/test-vm.sh \
+       /home/fedora/llm-companion/scripts/test-vm.sh \
        /home/fedora/llm-companion/vm-test
 chown -R fedora:fedora /home/fedora/llm-companion
-chmod +x /home/fedora/llm-companion/*.sh
+chmod +x /home/fedora/llm-companion/scripts/*.sh
 echo "$(ts) Project files ready at /home/fedora/llm-companion"
 
 # ── 3. Install ansible-core ───────────────────────────────────────────────────
@@ -548,10 +549,10 @@ echo "$(ts) 9p share mounted at /mnt/llm-companion"
 echo "$(ts) Copying project files..."
 cp -r /mnt/llm-companion /home/debian/llm-companion
 rm -rf /home/debian/llm-companion/.??* \
-       /home/debian/llm-companion/test-vm.sh \
+       /home/debian/llm-companion/scripts/test-vm.sh \
        /home/debian/llm-companion/vm-test
 chown -R debian:debian /home/debian/llm-companion
-chmod +x /home/debian/llm-companion/*.sh
+chmod +x /home/debian/llm-companion/scripts/*.sh
 echo "$(ts) Project files ready at /home/debian/llm-companion"
 
 # ── 3. Install ansible-core ───────────────────────────────────────────────────
@@ -676,7 +677,7 @@ QEMU_CMD=(
     -smbios   "type=1,serial=ds=nocloud"
     # Share the project directory read-only via 9p virtfs.
     # The VM mounts this at /mnt/llm-companion and copies files from there.
-    -virtfs   "local,path=${SCRIPT_DIR},mount_tag=llm-companion,security_model=none,readonly=on"
+    -virtfs   "local,path=${PROJECT_DIR},mount_tag=llm-companion,security_model=none,readonly=on"
     # User-mode networking: no root needed; port-forwards for SSH and WebUI.
     -netdev   "user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${WEB_PORT}-:8080"
     -device   "virtio-net-pci,netdev=net0"
