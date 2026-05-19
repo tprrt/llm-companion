@@ -26,7 +26,7 @@
 # How to update the Caddyfile:
 #   Edit the 'Caddyfile' key in the ConfigMap below, then re-apply:
 #     podman play kube stack.yml --replace
-#   (The Caddyfile in the repo root is the canonical reference — keep them in
+#   (The Caddyfile in caddy/ is the canonical reference — keep them in
 #    sync. The embedded copy here is what actually runs.)
 #
 # How to apply locally (Fedora / rootless Podman):

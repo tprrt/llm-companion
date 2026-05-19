@@ -10,14 +10,14 @@
 
 - name: Install check-services.sh to ~/.local/bin/
   ansible.builtin.copy:
-    src: "{{ llm_project_dir }}/check-services.sh"
+    src: "{{ llm_project_dir }}/scripts/check-services.sh"
     dest: "{{ ansible_user_dir }}/.local/bin/check-services.sh"
     remote_src: true
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 - name: Install pull-models.sh to ~/.local/bin/
   ansible.builtin.copy:
-    src: "{{ llm_project_dir }}/pull-models.sh"
+    src: "{{ llm_project_dir }}/scripts/pull-models.sh"
     dest: "{{ ansible_user_dir }}/.local/bin/pull-models.sh"
     remote_src: true
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
@@ -28,7 +28,7 @@
 # The destination is always stack.yml so the Quadlet unit needs no change.
 - name: Copy stack manifest to ~/.config/containers/systemd/
   ansible.builtin.copy:
-    src: "{{ llm_project_dir }}/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
+    src: "{{ llm_project_dir }}/kube/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
     dest: "{{ ansible_user_dir }}/.config/containers/systemd/stack.yml"
     remote_src: true
     mode: "0644" # NOSONAR — non-sensitive stack manifest; world-readable is intentional
@@ -148,7 +148,7 @@
 # ── Quadlet .kube unit ────────────────────────────────────────────────────────
 - name: Copy llm-companion.kube Quadlet unit
   ansible.builtin.copy:
-    src: "{{ llm_project_dir }}/llm-companion.kube"
+    src: "{{ llm_project_dir }}/kube/llm-companion.kube"
     dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion.kube"
     remote_src: true
     mode: "0644" # NOSONAR — non-sensitive Quadlet unit file; world-readable is intentional

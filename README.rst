@@ -13,7 +13,7 @@ llm-companion — Podman Kubernetes Pod stack for Fedora Server
 =============================================================
 
 Rootless Ollama server for **Fedora Server 41+** and **Debian 13+**, managed via
-a single Kubernetes Pod manifest (``stack.yml``) deployed by Ansible.
+a single Kubernetes Pod manifest (``kube/stack.yml``) deployed by Ansible.
 Multi-arch ready: x86-64 (CPU + AMD ROCm GPU) and ARM64.
 
 ----
@@ -33,7 +33,7 @@ Stack architecture
    │  ┌──────────────────────────────────────────────────┐  │
    │  │  caddy  :8080 (hostPort)                         │  │
    │  │  Bearer token auth on /ollama/api/* /ollama/v1/* │  │
-   │  │  Passes /searxng/* to SearXNG (Bearer token)      │  │
+   │  │  Passes /searxng/* to SearXNG (Bearer token)     │  │
    │  │  Passes / to Open WebUI                          │  │
    │  └───────────────────┬──────────────────────────────┘  │
    │                      │ localhost                       │
@@ -65,40 +65,6 @@ Stack architecture
 
 ----
 
-Deployment roadmap
-------------------
-
-.. list-table::
-   :header-rows: 1
-
-   * - Phase
-     - Host
-     - RAM
-     - GPU
-     - Models available
-   * - **Step 0**
-     - QEMU/KVM VM (any x86-64 Linux host)
-     - ≥ 1 GB
-     - —
-     - Same as Phase 1 — full stack in an isolated VM
-   * - **Step 1**
-     - ARM64
-     - ≤ 4 GB
-     - —
-     - Qwen2.5-Coder 1.5B · Qwen3 1.7B · Ministral-3 3B (4 GB only)
-   * - **Step 2**
-     - x86-64, CPU-only
-     - 8 GB
-     - —
-     - Ministral-3 3B/8B · Qwen3 8B · Qwen2.5-Coder 7B
-   * - **Step 3**
-     - x86-64, AMD Radeon
-     - ≥ 16 GB
-     - Radeon (ROCm)
-     - \+ Ministral-3 14B · Devstral-Small-2 24B
-
-----
-
 Directory layout
 ----------------
 
@@ -107,14 +73,12 @@ Directory layout
    .
    ├── Dockerfile                    # Multi-stage: cpu + rocm targets
    │
-   ├── Kubernetes Pod manifest
+   ├── kube/                         # Kubernetes Pod manifests and Quadlet unit
    │   ├── stack.yml                 # PVCs + ConfigMap + Pod (CPU variant)
-   │   └── stack-rocm.yml            # Same, AMD ROCm GPU variant (Phase 2)
-   │
-   ├── Quadlet unit (Fedora)
+   │   ├── stack-rocm.yml            # Same, AMD ROCm GPU variant
    │   └── llm-companion.kube        # Quadlet .kube unit — manages the pod via systemd
    │
-   ├── Ansible
+   ├── ansible/                      # Ansible playbook and roles
    │   ├── site.yml                  # Top-level playbook
    │   ├── group_vars/all.yml        # Stack-wide variables
    │   ├── inventory/
@@ -125,20 +89,21 @@ Directory layout
    │       ├── podman/               # Install Podman, SELinux boolean, build image
    │       └── llm-stack/            # Copy manifest, generate secrets, enable service
    │
-   ├── Caddy
-   │   └── Caddyfile                 # Reference copy — embedded in stack.yml ConfigMap
+   ├── caddy/
+   │   └── Caddyfile                 # Canonical reference — embedded in kube/stack.yml ConfigMap
    │
-   ├── Modelfiles (manual alternatives to pull-models.sh)
+   ├── modelfiles/                   # Manual alternatives to scripts/pull-models.sh
    │   ├── Modelfile.ministral-3-8b
    │   ├── Modelfile.ministral-3-14b
    │   ├── Modelfile.qwen3-8b        # Thinking mode disabled for agentic use
    │   ├── Modelfile.qwen2.5-coder
    │   └── Modelfile.devstral-small-2
    │
-   └── Scripts
-       ├── test-vm.sh                # Phase 0 — spin up a QEMU/KVM test VM
+   └── scripts/
+       ├── test-vm.sh                # Spin up a QEMU/KVM test VM
        ├── pull-models.sh            # Hardware-aware model pull + variant creation
-       └── generate-api-key.sh       # Create Bearer token for the Caddy proxy
+       ├── generate-api-key.sh       # Create Bearer token for the Caddy proxy
+       └── check-services.sh         # Health checks for the stack
 
 ----
 
@@ -149,7 +114,7 @@ All models are Apache 2.0 licensed. Sizes are at Q4_K_M quantization.
 
 ``pull-models.sh`` auto-detects your architecture, GPU, and available RAM, then
 selects the **best fitting model per category** (coding, vision, general, embedding).
-Run ``./pull-models.sh --list`` to preview what would be selected on your hardware.
+Run ``./scripts/pull-models.sh --list`` to preview what would be selected on your hardware.
 
 Coding — agentic tool use, multi-file edits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -301,15 +266,18 @@ Switch models inside OpenCode at any time with ``/models``.
 
 ----
 
-Phase 0 — Test in a QEMU/KVM VM
---------------------------------
+Setup
+-----
+
+Test in a QEMU/KVM VM
+~~~~~~~~~~~~~~~~~~~~~~
 
 Before deploying to real hardware, ``test-vm.sh`` provisions a throwaway Fedora VM
-that runs the full stack — same Ansible playbook, same ``stack.yml``, same build
+that runs the full stack — same Ansible playbook, same ``kube/stack.yml``, same build
 process. Use it to validate the setup end-to-end without touching production.
 
 Host prerequisites
-~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -322,11 +290,11 @@ Ensure your user can use KVM:
    sudo usermod -aG kvm $USER && newgrp kvm   # or log out/in
 
 Run the VM
-~~~~~~~~~~
+^^^^^^^^^^
 
 .. code-block:: bash
 
-   ./test-vm.sh          # 8 GB RAM · 4 vCPUs · 40 GB disk — all defaults
+   ./scripts/test-vm.sh          # 8 GB RAM · 4 vCPUs · 40 GB disk — all defaults
 
 The script will:
 
@@ -346,7 +314,7 @@ Watch live progress with:
    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 fedora@127.0.0.1 'tail -f llm-setup.log'
 
 Connection info
-~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^
 
 .. list-table::
    :header-rows: 1
@@ -363,43 +331,41 @@ Connection info
      - ``ssh -p 2222 fedora@127.0.0.1``
 
 Pull models inside the VM
-~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 SSH into the VM and run the pull script directly:
 
 .. code-block:: bash
 
-   ./test-vm.sh console
+   ./scripts/test-vm.sh console
    pull-models.sh
 
 Tear down
-~~~~~~~~~
+^^^^^^^^^
 
 .. code-block:: bash
 
-   ./test-vm.sh stop      # kill the QEMU process
-   ./test-vm.sh clean     # stop + delete overlay disk (keeps downloaded base image)
-   ./test-vm.sh mrproper  # also delete the downloaded base image
+   ./scripts/test-vm.sh stop      # kill the QEMU process
+   ./scripts/test-vm.sh clean     # stop + delete overlay disk (keeps downloaded base image)
+   ./scripts/test-vm.sh mrproper  # also delete the downloaded base image
 
 Options
-~~~~~~~
+^^^^^^^
 
 .. code-block:: bash
 
-   ./test-vm.sh --ram 12         # 12 GB RAM  (unit: GB, no upper limit)
-   ./test-vm.sh --cpus 8         # 8 vCPUs
-   ./test-vm.sh --disk 60        # 60 GB overlay disk
-   ./test-vm.sh --ssh-port 2222  # host SSH port  (default: 2222)
-   ./test-vm.sh --web-port 8080  # host web port  (default: 8080)
-   ./test-vm.sh --image /path/to/Fedora-Cloud-Base-Generic.x86_64-44-1.7.qcow2
+   ./scripts/test-vm.sh --ram 12         # 12 GB RAM  (unit: GB, no upper limit)
+   ./scripts/test-vm.sh --cpus 8         # 8 vCPUs
+   ./scripts/test-vm.sh --disk 60        # 60 GB overlay disk
+   ./scripts/test-vm.sh --ssh-port 2222  # host SSH port  (default: 2222)
+   ./scripts/test-vm.sh --web-port 8080  # host web port  (default: 8080)
+   ./scripts/test-vm.sh --image /path/to/Fedora-Cloud-Base-Generic.x86_64-44-1.7.qcow2
 
-----
+x86-64 (CPU only)
+~~~~~~~~~~~~~~~~~~
 
-Phase 1 — Setup (x86-64, CPU only, 8 GB)
------------------------------------------
-
-Step 1 — Clone and configure inventory
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Clone and configure inventory
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -423,8 +389,8 @@ Minimum inventory entry:
              ansible_user: fedora
              ansible_ssh_private_key_file: ~/.ssh/id_ed25519
 
-Step 2 — Run the Ansible playbook
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Run the Ansible playbook
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -435,17 +401,17 @@ The playbook handles everything in order:
 - **common**: creates required directories, enables ``loginctl linger``, sets up subuid/subgid
 - **firewall**: opens port 8080 (firewalld on Fedora, ufw on Debian)
 - **podman**: installs Podman + buildah, sets SELinux boolean, builds the Ollama image
-- **llm-stack**: copies ``stack.yml``, generates API key and WebUI secret, installs and starts the service
+- **llm-stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
 
-Step 3 — Pull models
-~~~~~~~~~~~~~~~~~~~~~
+Pull models
+^^^^^^^^^^^
 
 .. code-block:: bash
 
-   ./pull-models.sh               # best model per category (coding, vision, general, embedding)
-   ./pull-models.sh --list        # dry run — show what would be pulled
-   ./pull-models.sh --all         # pull all models that fit the hardware
-   ./pull-models.sh --reserve 4   # reserve 4 GB instead of the default 2 GB
+   ./scripts/pull-models.sh               # best model per category (coding, vision, general, embedding)
+   ./scripts/pull-models.sh --list        # dry run — show what would be pulled
+   ./scripts/pull-models.sh --all         # pull all models that fit the hardware
+   ./scripts/pull-models.sh --reserve 4   # reserve 4 GB instead of the default 2 GB
 
 ``pull-models.sh`` auto-detects your architecture (x86_64 / aarch64), GPU (AMD ROCm
 / NVIDIA CUDA), and available RAM, then selects the **best fitting model per category**.
@@ -455,8 +421,8 @@ On an 8 GB x86_64 CPU host (2 GB reserved), selects:
 ``qwen3-8b-16k`` (coding), ``ministral-3-8b-16k`` (vision), ``qwen3-8b-16k`` (general, shared),
 ``nomic-embed-text-8k`` (embedding)
 
-Step 4 — Verify the proxy
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Verify the proxy
+^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -477,8 +443,8 @@ Step 4 — Verify the proxy
    curl -s -H "Authorization: Bearer $KEY" \
        'http://localhost:8080/searxng/search?q=test&format=json' | python3 -m json.tool
 
-Step 5 — Configure OpenCode
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Configure OpenCode
+^^^^^^^^^^^^^^^^^^
 
 ``~/.config/opencode/opencode.json`` on the **client**:
 
@@ -509,13 +475,11 @@ Step 5 — Configure OpenCode
 
 Replace ``<server-ip>`` with your LAN IP or Tailscale/WireGuard address.
 
-----
-
-Phase 2 — AMD Radeon GPU host
-------------------------------
+AMD Radeon GPU (x86-64)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Additional prerequisites
-~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -525,35 +489,35 @@ Additional prerequisites
    rocm-smi --showproductname
    rocminfo | grep gfx   # note your gfx version
 
-Run the playbook with the ROCm build target
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Run the Ansible playbook
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml \
        -e "ollama_build_target=rocm"
 
-This builds ``localhost/ollama-rocm:latest`` and deploys ``stack-rocm.yml``
+This builds ``localhost/ollama-rocm:latest`` and deploys ``kube/stack-rocm.yml``
 (which sets ``ROCR_VISIBLE_DEVICES=all`` and ``securityContext.privileged: true``
 for ``/dev/kfd`` + ``/dev/dri`` access) as the active stack manifest.
 
 .. warning::
 
-   ``stack-rocm.yml`` runs the Ollama container in **privileged mode**.
+   ``kube/stack-rocm.yml`` runs the Ollama container in **privileged mode**.
    This is required for AMD GPU access (``/dev/kfd``, ``/dev/dri``) but
    bypasses most kernel namespace isolation — a compromised container
    process can affect the host. Only deploy the ROCm variant on a
    dedicated, trusted host that is not shared with other workloads.
 
-Set ``HSA_OVERRIDE_GFX_VERSION`` in ``stack-rocm.yml`` if your card needs it
+Set ``HSA_OVERRIDE_GFX_VERSION`` in ``kube/stack-rocm.yml`` if your card needs it
 (uncomment the env var and set the value to your gfx version string).
 
 Pull GPU models
-~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
-   ./pull-models.sh --all   # bypass RAM check — pull everything
+   ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
 
 Adds ``ministral-3-14b-16k`` and ``devstral-small-2-32k``.
 
@@ -566,12 +530,10 @@ Add to ``opencode.json`` models block:
 
 Change default: ``"model": "ollama/devstral-small-2-32k"``
 
-----
+ARM64
+~~~~~
 
-Phase 3 — ARM64
-----------------
-
-No code changes needed — the same Dockerfile ``cpu`` target, ``stack.yml``,
+No code changes needed — the same Dockerfile ``cpu`` target, ``kube/stack.yml``,
 Ansible playbook, and scripts work unchanged on ARM64.
 
 .. code-block:: bash
@@ -587,11 +549,11 @@ Then pull models with RAM auto-detection:
 
 .. code-block:: bash
 
-   ./pull-models.sh
+   ./scripts/pull-models.sh
 
 On a 2 GB device, ``pull-models.sh`` will pull ``qwen2.5-coder:1.5b`` and
 ``qwen3:1.7b`` only. On a 4 GB device it will also pull ``ministral-3:3b``.
-The 6 GB+ models from Phase 1 are automatically skipped.
+Models above the hardware gate are automatically skipped.
 
 ----
 
@@ -603,13 +565,13 @@ Updating the stack
    # Re-run the playbook to pick up any changes (idempotent):
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
 
-   # Pull pinned images and replace the pod (bump version tags in stack.yml first):
+   # Pull pinned images and replace the pod (bump version tags in kube/stack.yml first):
    podman pull docker.io/library/caddy:2.11.2
    podman pull ghcr.io/open-webui/open-webui:v0.9.2
    podman pull docker.io/searxng/searxng:2026.4.17-e8299a4c3
    systemctl --user restart llm-companion
 
-``AutoUpdate=registry`` in ``llm-companion.kube`` also enables automatic updates via:
+``AutoUpdate=registry`` in ``kube/llm-companion.kube`` also enables automatic updates via:
 
 .. code-block:: bash
 
@@ -624,7 +586,7 @@ Rotating the API key
 
 .. code-block:: bash
 
-   ./generate-api-key.sh            # generates a new key, overwrites api-key.env
+   ./scripts/generate-api-key.sh            # generates a new key, overwrites api-key.env
    # Then re-run Ansible to update the Secret and restart the pod:
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
    # Update opencode.json on all client machines
@@ -651,7 +613,7 @@ Useful commands
    # Pull a model manually
    podman exec -it llm-companion-ollama ollama pull ministral-3:8b
 
-   # Reload Caddy config without restart (after updating stack.yml ConfigMap)
+   # Reload Caddy config without restart (after updating kube/stack.yml ConfigMap)
    podman exec llm-companion-caddy caddy reload --config /etc/caddy/Caddyfile
 
    # Check SearXNG logs
@@ -692,7 +654,7 @@ Check that SearXNG is running and responding:
 
 If SearXNG has not started yet, wait for the readiness probe (10 s initial delay).
 If the JSON response is missing, confirm ``formats: [html, json]`` is present in
-the ``searxng-settings.yml`` key of the ConfigMap in ``stack.yml``.
+the ``searxng-settings.yml`` key of the ConfigMap in ``kube/stack.yml``.
 
 ----
 
@@ -731,7 +693,7 @@ SSH into the VM and run the pull script directly:
 
 .. code-block:: bash
 
-   ./test-vm.sh console
+   ./scripts/test-vm.sh console
    pull-models.sh
 
 **``systemctl --user`` fails over SSH ("Failed to connect to bus")**

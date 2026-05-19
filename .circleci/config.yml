@@ -94,7 +94,7 @@ jobs:
   # caddy-validate — formatting and syntax check for the Caddyfile
   #
   # caddy fmt exits 1 if the file is not already formatted.
-  # Fix locally with: caddy fmt --overwrite Caddyfile
+  # Fix locally with: caddy fmt --overwrite caddy/Caddyfile
   # OLLAMA_API_KEY is set to a placeholder so {$OLLAMA_API_KEY} resolves
   # during syntax validation without a real secret.
   # ---------------------------------------------------------------------------
@@ -105,17 +105,17 @@ jobs:
       - run:
           name: Check Caddyfile formatting
           # Snapshot the original, format in-place, diff against the snapshot.
-          # Fix locally with: caddy fmt --overwrite Caddyfile
+          # Fix locally with: caddy fmt --overwrite caddy/Caddyfile
           command: |
-            cp Caddyfile /tmp/Caddyfile.orig
-            caddy fmt --overwrite Caddyfile
-            if ! diff -u /tmp/Caddyfile.orig Caddyfile; then
-              echo "Caddyfile was not formatted. Run: caddy fmt --overwrite Caddyfile"
+            cp caddy/Caddyfile /tmp/Caddyfile.orig
+            caddy fmt --overwrite caddy/Caddyfile
+            if ! diff -u /tmp/Caddyfile.orig caddy/Caddyfile; then
+              echo "Caddyfile was not formatted. Run: caddy fmt --overwrite caddy/Caddyfile"
               exit 1
             fi
       - run:
           name: Validate Caddyfile syntax
-          command: OLLAMA_API_KEY=ci-placeholder caddy validate --config Caddyfile
+          command: OLLAMA_API_KEY=ci-placeholder caddy validate --config caddy/Caddyfile
 
   # ---------------------------------------------------------------------------
   # ansible-lint — lint all Ansible playbooks and roles
@@ -148,7 +148,7 @@ jobs:
               | tar -xz -C /usr/local/bin kubeconform
       - run:
           name: Validate Kubernetes manifests
-          command: kubeconform -strict -summary stack.yml stack-rocm.yml llm-companion.kube
+          command: kubeconform -strict -summary kube/stack.yml kube/stack-rocm.yml kube/llm-companion.kube
 
   # ---------------------------------------------------------------------------
   # check-caddyfile-sync — verify the canonical Caddyfile matches the copy
@@ -184,11 +184,11 @@ jobs:
                     if line.strip() and not line.strip().startswith("# SPDX-")
                 )
 
-            canonical = open("Caddyfile").read()
+            canonical = open("caddy/Caddyfile").read()
             canonical_norm = normalize(canonical)
 
             ok = True
-            for manifest in ("stack.yml", "stack-rocm.yml"):
+            for manifest in ("kube/stack.yml", "kube/stack-rocm.yml"):
                 embedded = None
                 with open(manifest) as fh:
                     for doc in yaml.safe_load_all(fh):
@@ -233,8 +233,8 @@ jobs:
           command: |
             rc=0
             for f in \
-              *.sh Dockerfile Caddyfile *.container *.network Modelfile.* \
-              *.yml *.kube *.properties \
+              scripts/*.sh Dockerfile caddy/Caddyfile *.container *.network modelfiles/Modelfile.* \
+              kube/*.yml kube/*.kube *.properties \
               ansible/**/*.yml; do
               [ -f "$f" ] || continue
               if ! grep -q "SPDX-License-Identifier:" "$f"; then
