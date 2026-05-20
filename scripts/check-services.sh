@@ -17,7 +17,7 @@
 #   Caddy/SearXNG localhost:8080   GET /searxng/  → HTTP 200 (proxied to SearXNG)
 #
 # Installed by Ansible to ~/.local/bin/check-services.sh on the target host.
-# Also callable via: ./test-vm.sh check
+# Also callable via: ./vm.sh check
 # =============================================================================
 
 set -uo pipefail

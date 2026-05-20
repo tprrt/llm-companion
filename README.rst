@@ -100,7 +100,7 @@ Directory layout
    │   └── Modelfile.devstral-small-2
    │
    └── scripts/
-       ├── test-vm.sh                # Spin up a QEMU/KVM test VM
+       ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
        ├── pull-models.sh            # Hardware-aware model pull + variant creation
        ├── generate-api-key.sh       # Create Bearer token for the Caddy proxy
        └── check-services.sh         # Health checks for the stack
@@ -269,12 +269,12 @@ Switch models inside OpenCode at any time with ``/models``.
 Setup
 -----
 
-Test in a QEMU/KVM VM
-~~~~~~~~~~~~~~~~~~~~~~
+Deploy in a QEMU/KVM VM
+~~~~~~~~~~~~~~~~~~~~~~~
 
-Before deploying to real hardware, ``test-vm.sh`` provisions a throwaway Fedora VM
-that runs the full stack — same Ansible playbook, same ``kube/stack.yml``, same build
-process. Use it to validate the setup end-to-end without touching production.
+``vm.sh`` provisions a QEMU/KVM VM that runs the full stack — same Ansible playbook,
+same ``kube/stack.yml``, same build process. Use it for local testing or to deploy the
+VM on a remote server.
 
 Host prerequisites
 ^^^^^^^^^^^^^^^^^^
@@ -289,29 +289,72 @@ Ensure your user can use KVM:
 
    sudo usermod -aG kvm $USER && newgrp kvm   # or log out/in
 
-Run the VM
-^^^^^^^^^^
+Workflow
+^^^^^^^^
+
+``build`` is the one-time provisioning step; ``start``/``stop`` are for day-to-day
+operation. Each built VM is identified by a ``--name`` (defaults to the distro name
+when omitted) and stores its settings in ``<vm-dir>/<name>.conf``.
 
 .. code-block:: bash
 
-   ./scripts/test-vm.sh          # 8 GB RAM · 4 vCPUs · 40 GB disk — all defaults
+   # First build — name defaults to 'fedora'
+   ./scripts/vm.sh build
+   # Or with an explicit name (e.g. to run multiple VMs with different resources)
+   ./scripts/vm.sh build --distro fedora --name fedora-gpu --ram 32 --cpus 8
 
-The script will:
+   # Subsequent boots (~2 min from the pre-built golden image)
+   # --name is auto-detected when only one .conf exists in vm-dir
+   ./scripts/vm.sh start
+   ./scripts/vm.sh stop
 
-1. Download the Fedora 44 Cloud Base image (~700 MB, cached in ``vm-test/``)
-2. Create a qcow2 overlay disk
-3. Launch QEMU with the project directory shared read-only via 9p virtfs
-4. Run the full setup inside the VM via cloud-init:
-   install ``ansible-core`` → run ``ansible-playbook ansible/site.yml`` (local)
-5. Reboot the VM so that the ``llm-companion`` service starts via ``loginctl linger``
-6. Wait and print connection info when ready
-
-Expect **10–20 minutes** on the first run (``dnf upgrade`` + ``podman pull``).
-Watch live progress with:
+After a code change, rebuild the golden image:
 
 .. code-block:: bash
 
-   ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 fedora@127.0.0.1 'tail -f llm-setup.log'
+   ./scripts/vm.sh clean && ./scripts/vm.sh build && ./scripts/vm.sh start
+
+   # Explicit name when multiple VMs exist
+   ./scripts/vm.sh clean --name fedora-gpu && \
+   ./scripts/vm.sh build --name fedora-gpu --distro fedora --ram 32 --cpus 8 && \
+   ./scripts/vm.sh start --name fedora-gpu
+
+Build-only options (``--distro``, ``--ram``, ``--cpus``, ``--disk``, ``--ssh-port``,
+``--web-port``, ``--image``) are only valid for ``build``; other subcommands load
+those settings from ``<name>.conf``.
+
+Systemd user service
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: ini
+
+   [Service]
+   Type=notify
+   NotifyAccess=all
+   ExecStart=/path/to/vm.sh start --name <name>
+   ExecStop=/path/to/vm.sh stop  --name <name>
+
+When started as a service, ``vm.sh start`` signals readiness once the VM is up
+then stays alive forwarding ``journalctl --user -f`` output from inside the VM
+to stdout, which systemd captures to journald. Interactive runs exit after
+printing the ready banner (QEMU keeps running in the background).
+
+``build`` writes the unit file (using the same RAM/CPU settings as the build)
+but does not activate it. Run ``enable`` once to register the service:
+
+.. code-block:: bash
+
+   ./scripts/vm.sh enable              # auto-detected when only one VM exists
+   ./scripts/vm.sh enable --name fedora-gpu
+   ./scripts/vm.sh disable --name fedora-gpu   # stop + disable (unit file is kept)
+
+   # Day-to-day (service name matches --name)
+   systemctl --user start   llm-companion-vm-fedora-gpu.service
+   systemctl --user stop    llm-companion-vm-fedora-gpu.service
+   journalctl --user -u     llm-companion-vm-fedora-gpu.service -f
+
+``enable`` activates ``loginctl linger`` so the user's systemd instance —
+and this service — start at boot without an active login session.
 
 Connection info
 ^^^^^^^^^^^^^^^
@@ -337,7 +380,7 @@ SSH into the VM and run the pull script directly:
 
 .. code-block:: bash
 
-   ./scripts/test-vm.sh console
+   ./scripts/vm.sh console
    pull-models.sh
 
 Tear down
@@ -345,21 +388,35 @@ Tear down
 
 .. code-block:: bash
 
-   ./scripts/test-vm.sh stop      # kill the QEMU process
-   ./scripts/test-vm.sh clean     # stop + delete overlay disk (keeps downloaded base image)
-   ./scripts/test-vm.sh mrproper  # also delete the downloaded base image
+   ./scripts/vm.sh stop                  # auto-detected when one VM
+   ./scripts/vm.sh stop --name fedora-gpu
+   ./scripts/vm.sh clean                 # stop + delete overlay/golden (keeps base image)
+   ./scripts/vm.sh clean --name fedora-gpu
+   ./scripts/vm.sh mrproper              # also delete the downloaded base image
 
-Options
-^^^^^^^
+Build options
+^^^^^^^^^^^^^
+
+These options are only valid for ``build``. Other subcommands read the values from
+``<name>.conf``.
 
 .. code-block:: bash
 
-   ./scripts/test-vm.sh --ram 12         # 12 GB RAM  (unit: GB, no upper limit)
-   ./scripts/test-vm.sh --cpus 8         # 8 vCPUs
-   ./scripts/test-vm.sh --disk 60        # 60 GB overlay disk
-   ./scripts/test-vm.sh --ssh-port 2222  # host SSH port  (default: 2222)
-   ./scripts/test-vm.sh --web-port 8080  # host web port  (default: 8080)
-   ./scripts/test-vm.sh --image /path/to/Fedora-Cloud-Base-Generic.x86_64-44-1.7.qcow2
+   ./scripts/vm.sh build --distro fedora        # fedora (default) or debian
+   ./scripts/vm.sh build --name fedora-gpu      # VM name (default: distro name)
+   ./scripts/vm.sh build --ram 12               # 12 GB RAM  (unit: GB, no upper limit)
+   ./scripts/vm.sh build --cpus 8               # 8 vCPUs
+   ./scripts/vm.sh build --disk 60              # 60 GB overlay disk
+   ./scripts/vm.sh build --ssh-port 2222        # host SSH port  (default: 2222)
+   ./scripts/vm.sh build --web-port 8080        # host web port  (default: 8080)
+   ./scripts/vm.sh build --image /path/to/Fedora-Cloud-Base-Generic.x86_64-44-1.7.qcow2
+
+Remote server:
+
+.. code-block:: bash
+
+   ./scripts/vm.sh build --host myserver.example.com  # rsync + build on remote host
+   ./scripts/vm.sh start --host myserver.example.com  # forward any subcommand
 
 x86-64 (CPU only)
 ~~~~~~~~~~~~~~~~~~
@@ -693,7 +750,7 @@ SSH into the VM and run the pull script directly:
 
 .. code-block:: bash
 
-   ./scripts/test-vm.sh console
+   ./scripts/vm.sh console
    pull-models.sh
 
 **``systemctl --user`` fails over SSH ("Failed to connect to bus")**
