@@ -373,6 +373,47 @@ Connection info
    * - SSH
      - ``ssh -p 2222 fedora@127.0.0.1``
 
+Accessing services from a remote server
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When the VM runs on a remote server (e.g. reachable only over VPN), open an
+SSH local-port-forward so your browser hits the Caddy proxy on port 8080:
+
+.. code-block:: bash
+
+   ssh -N -L 8080:localhost:8080 user@server   # keep terminal open
+   # or in the background:
+   ssh -fN -L 8080:localhost:8080 user@server
+
+All services are then reachable on your local machine:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Service
+     - URL
+   * - Open WebUI
+     - ``http://localhost:8080``
+   * - Ollama API
+     - ``http://localhost:8080/ollama/v1``
+   * - SearXNG
+     - ``http://localhost:8080/searxng/``
+
+For convenience, add the forwards to ``~/.ssh/config`` so any ``ssh
+llm-server`` session opens the tunnels automatically:
+
+.. code-block:: text
+
+   Host llm-server
+       HostName server.example.com
+       User     myuser
+       LocalForward 8080 localhost:8080
+       LocalForward 2222 localhost:2222   # optional: reach the VM console locally
+
+The second ``LocalForward`` lets you run ``./scripts/vm.sh console`` or
+``ssh -p 2222 fedora@127.0.0.1`` from your local machine as if the VM were
+local.
+
 Pull models inside the VM
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
