@@ -274,8 +274,33 @@ wait_for_ssh() {
 
 wait_for_service() {
     step "Waiting for llm-companion service to become active..."
-    # shellcheck disable=SC2016
-    until ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-active llm-companion' 2>/dev/null; do sleep 5; done
+    local state running
+    while true; do
+        # shellcheck disable=SC2016
+        state=$(ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user is-active llm-companion' 2>/dev/null || true)
+        case "${state}" in
+            active)
+                info "llm-companion is active."
+                return 0
+                ;;
+            failed)
+                warn "llm-companion failed to start. Recent journal:"
+                # shellcheck disable=SC2016
+                ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) journalctl --user -u llm-companion -n 20 --no-pager' \
+                    2>/dev/null || true
+                die "Service failed to start. Run './vm.sh logs' for details."
+                ;;
+            *)
+                running=$(ssh_q 'podman ps --format "{{.Names}}"' 2>/dev/null | tr '\n' ' ' || true)
+                if [[ -n "${running// /}" ]]; then
+                    info "${state:-unknown} — containers up: ${running}"
+                else
+                    info "${state:-unknown} — no containers yet (image pull in progress)"
+                fi
+                sleep 10
+                ;;
+        esac
+    done
 }
 
 # ── Remote helpers ────────────────────────────────────────────────────────────
