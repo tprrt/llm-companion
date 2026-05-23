@@ -38,7 +38,14 @@ pod_health_check() {
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — ${status}"
         return 0
     else
-        printf '%b[FAIL]%b  %s\n' "${RED}" "${NC}" "${name} — ${status:-unknown}"
+        local cstate restarts
+        cstate=$(podman inspect --format '{{.State.Status}}' "${container}" 2>/dev/null || echo "?")
+        restarts=$(podman inspect --format '{{.RestartCount}}' "${container}" 2>/dev/null || echo "?")
+        printf '%b[FAIL]%b  %s\n' "${RED}" "${NC}" "${name} — health:${status:-unknown} container:${cstate} restarts:${restarts}"
+        if [[ "${cstate}" == "stopped" || "${cstate}" == "exited" ]]; then
+            printf '         recent logs:\n'
+            podman logs --tail 5 "${container}" 2>&1 | sed 's/^/           /'
+        fi
         return 1
     fi
 }
