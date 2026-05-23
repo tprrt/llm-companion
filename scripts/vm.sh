@@ -253,7 +253,7 @@ vm_stop() {
 }
 
 ssh_q() {
-    local opts="-o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes -p ${SSH_PORT}"
+    local opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o BatchMode=yes -p ${SSH_PORT}"
     [[ -f "${VM_SSH_KEY}" ]] && opts="${opts} -i ${VM_SSH_KEY}"
     # shellcheck disable=SC2086,SC2029
     # 127.0.0.1 (not localhost) to avoid IPv6 — QEMU user-net only binds IPv4.
@@ -263,7 +263,7 @@ ssh_q() {
 check_services() {
     vm_is_running || die "VM '${NAME}' is not running."
     step "Service health checks (via SSH)..."
-    ssh_q ~/.local/bin/check-services.sh
+    ssh_q '~/.local/bin/check-services.sh'
 }
 
 wait_for_ssh() {
@@ -544,7 +544,7 @@ fi
 # ── logs ──────────────────────────────────────────────────────────────────────
 if [[ "${SUBCMD}" == "logs" ]]; then
     if vm_is_running && ssh_q true 2>/dev/null; then
-        SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT}"
+        SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
         [[ -f "${VM_SSH_KEY}" ]] && SSH_OPTS="${SSH_OPTS} -i ${VM_SSH_KEY}"
         if ssh_q 'test -f ~/.llm-companion-setup-done' 2>/dev/null; then
             # shellcheck disable=SC2086
@@ -561,7 +561,7 @@ fi
 # ── console ───────────────────────────────────────────────────────────────────
 if [[ "${SUBCMD}" == "console" ]]; then
     vm_is_running || die "VM '${NAME}' is not running."
-    SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT}"
+    SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
     [[ -f "${VM_SSH_KEY}" ]] && SSH_OPTS="${SSH_OPTS} -i ${VM_SSH_KEY}"
     # shellcheck disable=SC2086
     exec ssh ${SSH_OPTS} "${VM_USER}@127.0.0.1"
@@ -1054,7 +1054,7 @@ echo ""
 # Interactive invocations (no NOTIFY_SOCKET) exit here; QEMU keeps running.
 if [[ -n "${NOTIFY_SOCKET:-}" ]]; then
     systemd-notify --ready 2>/dev/null || true
-    SSH_LOG_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${SSH_PORT}"
+    SSH_LOG_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
     [[ -f "${VM_SSH_KEY}" ]] && SSH_LOG_OPTS="${SSH_LOG_OPTS} -i ${VM_SSH_KEY}"
     # exec replaces this shell; the EXIT trap fires here, cleaning up TAIL_PID.
     # shellcheck disable=SC2086
