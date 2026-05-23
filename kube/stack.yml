@@ -342,13 +342,15 @@ spec:
               name: llm-companion-secrets
               key: open-terminal-api-key
       livenessProbe:
-        tcpSocket:
+        httpGet:
+          path: /
           port: 8000
         initialDelaySeconds: 10
         periodSeconds: 30
         timeoutSeconds: 5
       readinessProbe:
-        tcpSocket:
+        httpGet:
+          path: /
           port: 8000
         initialDelaySeconds: 10
         periodSeconds: 10
@@ -383,13 +385,15 @@ spec:
         - name: INSTANCE_NAME
           value: "llm-companion"
       livenessProbe:
-        tcpSocket:
+        httpGet:
+          path: /
           port: 8888
         initialDelaySeconds: 10
         periodSeconds: 30
         timeoutSeconds: 5
       readinessProbe:
-        tcpSocket:
+        httpGet:
+          path: /
           port: 8888
         initialDelaySeconds: 10
         periodSeconds: 10
