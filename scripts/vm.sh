@@ -15,7 +15,7 @@
 #             cloud-init, bake a golden qcow2 image, and write <name>.conf.
 #   start     Start the VM from the golden image; stream logs until ready
 #   stop      Stop the running VM
-#   clean     Stop + delete overlay/seed/golden for one VM (--name) or all
+#   clean     Stop + delete overlay/seed/golden + unit file for one VM (--name) or all
 #   mrproper  Like clean, but also delete the downloaded base image(s)
 #   status    Show whether the VM is running and its connection info
 #   logs      Stream the VM console log (tail -f)
@@ -405,6 +405,18 @@ clean_one() {
           "${VM_DIR}/monitor-${n}.sock"
 }
 
+remove_unit() {
+    local n="$1"
+    local unit="llm-companion-vm-${n}.service"
+    local unit_file="${HOME}/.config/systemd/user/${unit}"
+    [[ -f "${unit_file}" ]] || return 0
+    systemctl --user is-active "${unit}" &>/dev/null && systemctl --user stop "${unit}"
+    systemctl --user disable "${unit}" 2>/dev/null || true
+    rm -f "${unit_file}"
+    systemctl --user daemon-reload
+    info "Unit file removed: ${unit_file}"
+}
+
 vm_has_artifacts() {
     local n="$1"
     [[ -f "${VM_DIR}/overlay-${n}.qcow2" ]] || \
@@ -438,6 +450,7 @@ if [[ "${SUBCMD}" == "clean" ]]; then
         if vm_has_artifacts "${NAME}" || [[ -f "${CONSOLE_LOG}" ]]; then
             clean_one "${NAME}"
             rm -f "${CONSOLE_LOG}"
+            remove_unit "${NAME}"
             info "Artifacts for '${NAME}' deleted."
         else
             info "Nothing to clean for '${NAME}'."
@@ -459,6 +472,7 @@ if [[ "${SUBCMD}" == "clean" ]]; then
                 fi
                 clean_one "${_n}"
                 rm -f "${VM_DIR}/console-${_n}.log"
+                remove_unit "${_n}"
                 info "Artifacts for '${_n}' deleted."
             done
         fi
