@@ -12,7 +12,7 @@
 #   chmod +x generate-api-key.sh
 #   ./generate-api-key.sh
 #
-# The key is written to ~/.config/ollama/api-key.env in the format:
+# The key is written to $HOME/.config/ollama/api-key.env in the format:
 #   OLLAMA_API_KEY=sk-ollama-<random>
 #
 # Use this key in opencode.json and anywhere else you call the Ollama API:
