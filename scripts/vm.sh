@@ -266,6 +266,22 @@ check_services() {
     ssh_q "\$HOME/.local/bin/check-services.sh"
 }
 
+wait_for_services() {
+    local timeout=300 interval=15 elapsed=0 out
+    step "Waiting for all services to be healthy..."
+    while true; do
+        out=$(ssh_q "\$HOME/.local/bin/check-services.sh" 2>/dev/null) && { echo "${out}"; return 0; }
+        elapsed=$((elapsed + interval))
+        if [[ ${elapsed} -ge ${timeout} ]]; then
+            echo "${out}"
+            warn "Some services are not healthy after ${timeout}s — run './vm.sh check' to inspect."
+            return 1
+        fi
+        info "Not all services ready yet (${elapsed}s / ${timeout}s)..."
+        sleep ${interval}
+    done
+}
+
 wait_for_ssh() {
     step "Waiting for VM to boot (SSH)..."
     until ssh_q true 2>/dev/null; do sleep 5; done
@@ -1018,10 +1034,7 @@ trap 'kill "${TAIL_PID}" 2>/dev/null || true; stty sane 2>/dev/null || true' EXI
 wait_for_ssh
 wait_for_service
 
-info "Checking service status..."
-# shellcheck disable=SC2016
-ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status llm-companion --no-pager -l' 2>/dev/null || true
-check_services || true
+wait_for_services || true
 
 API_KEY=$(ssh_q "grep OLLAMA_API_KEY \$HOME/.config/ollama/api-key.env 2>/dev/null | cut -d= -f2-" 2>/dev/null \
           || echo "(not found — check $HOME/llm-setup.log in the VM)")
