@@ -16,7 +16,7 @@
 #   Caddy         localhost:8080   GET /health    → HTTP 200 (proxied to Open WebUI)
 #   Caddy/SearXNG localhost:8080   GET /searxng/  → HTTP 200 (proxied to SearXNG)
 #
-# Installed by Ansible to ~/.local/bin/check-services.sh on the target host.
+# Installed by Ansible to $HOME/.local/bin/check-services.sh on the target host.
 # Also callable via: ./vm.sh check
 # =============================================================================
 
@@ -24,7 +24,7 @@ set -uo pipefail
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 
-OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY ~/.config/ollama/api-key.env | cut -d= -f2- || true)
+OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
 
 # http_check: pass only on HTTP 200; any other code (000 = no connection) is a failure.
 http_check() {

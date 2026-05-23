@@ -30,8 +30,8 @@
 #   --vm-dir DIR        Directory for VM artifacts             (default: ./vm-test)
 #   --host HOST                Remote server: run the subcommand on HOST via SSH
 #   --user USER                SSH user for --host                  (default: $USER)
-#   --remote-project-dir DIR   Project directory on the remote host (default: ~/llm-companion)
-#   --remote-vm-dir DIR        vm-dir to use on the remote host     (default: ~/vm-test)
+#   --remote-project-dir DIR   Project directory on the remote host (default: $HOME/llm-companion)
+#   --remote-vm-dir DIR        vm-dir to use on the remote host     (default: $HOME/vm-test)
 #
 # Build-only options (only valid with 'build'):
 #   --distro DISTRO     Target distribution: fedora or debian  (default: fedora)
@@ -263,7 +263,7 @@ ssh_q() {
 check_services() {
     vm_is_running || die "VM '${NAME}' is not running."
     step "Service health checks (via SSH)..."
-    ssh_q '~/.local/bin/check-services.sh'
+    ssh_q "\$HOME/.local/bin/check-services.sh"
 }
 
 wait_for_ssh() {
@@ -546,7 +546,7 @@ if [[ "${SUBCMD}" == "logs" ]]; then
     if vm_is_running && ssh_q true 2>/dev/null; then
         SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
         [[ -f "${VM_SSH_KEY}" ]] && SSH_OPTS="${SSH_OPTS} -i ${VM_SSH_KEY}"
-        if ssh_q 'test -f ~/.llm-companion-setup-done' 2>/dev/null; then
+        if ssh_q "test -f \$HOME/.llm-companion-setup-done" 2>/dev/null; then
             # shellcheck disable=SC2086
             exec ssh ${SSH_OPTS} "${VM_USER}@127.0.0.1" 'journalctl --user -f --no-pager'
         else
@@ -685,7 +685,7 @@ if [[ "${SUBCMD}" == "build" ]]; then
 
     # ── SSH public key ────────────────────────────────────────────────────────
     SSH_PUB_KEY=""
-    for _candidate in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub ~/.ssh/id_ecdsa.pub; do
+    for _candidate in $HOME/.ssh/id_ed25519.pub $HOME/.ssh/id_rsa.pub $HOME/.ssh/id_ecdsa.pub; do
         if [[ -f "${_candidate}" ]]; then
             SSH_PUB_KEY=$(cat "${_candidate}")
             info "Using existing SSH public key: ${_candidate}"
@@ -737,7 +737,7 @@ dnf install -y ansible-core
 echo "$(ts) ansible-core installed"
 echo "$(ts) Running Ansible playbook..."
 sudo -u fedora bash -c '
-    cd ~/llm-companion
+    cd $HOME/llm-companion
     ansible-playbook -c local -i "localhost," -e "ansible_user=fedora" ansible/site.yml
 '
 echo "$(ts) Ansible playbook complete"
@@ -775,7 +775,7 @@ apt-get install -y ansible
 echo "$(ts) ansible-core installed"
 echo "$(ts) Running Ansible playbook..."
 sudo -u debian bash -c '
-    cd ~/llm-companion
+    cd $HOME/llm-companion
     ansible-playbook -c local -i "localhost," -e "ansible_user=debian" ansible/site.yml
 '
 echo "$(ts) Ansible playbook complete"
@@ -869,7 +869,7 @@ YAML
     info "SSH is up — cloud-init setup is running (package upgrade + podman build, 10–20 min)."
 
     step "Waiting for Ansible provisioning to complete (polls every 20 s)..."
-    until ssh_q 'test -f ~/.llm-companion-setup-done' 2>/dev/null; do sleep 20; done
+    until ssh_q "test -f \$HOME/.llm-companion-setup-done" 2>/dev/null; do sleep 20; done
     info "Setup done — VM is rebooting to start llm-companion service."
 
     sleep 20
@@ -931,7 +931,7 @@ if [[ ! -f "${SEED_ISO}" ]]; then
     [[ -n "${ISO_TOOL}" ]] || die "No ISO creation tool found. Install one: sudo dnf install genisoimage"
 
     SSH_PUB_KEY=""
-    for _candidate in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub ~/.ssh/id_ecdsa.pub; do
+    for _candidate in $HOME/.ssh/id_ed25519.pub $HOME/.ssh/id_rsa.pub $HOME/.ssh/id_ecdsa.pub; do
         if [[ -f "${_candidate}" ]]; then
             SSH_PUB_KEY=$(cat "${_candidate}")
             break
@@ -1023,8 +1023,8 @@ info "Checking service status..."
 ssh_q 'XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user status llm-companion --no-pager -l' 2>/dev/null || true
 check_services || true
 
-API_KEY=$(ssh_q 'grep OLLAMA_API_KEY ~/.config/ollama/api-key.env 2>/dev/null | cut -d= -f2-' 2>/dev/null \
-          || echo "(not found — check ~/llm-setup.log in the VM)")
+API_KEY=$(ssh_q "grep OLLAMA_API_KEY \$HOME/.config/ollama/api-key.env 2>/dev/null | cut -d= -f2-" 2>/dev/null \
+          || echo "(not found — check $HOME/llm-setup.log in the VM)")
 
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════════════════════${NC}"
