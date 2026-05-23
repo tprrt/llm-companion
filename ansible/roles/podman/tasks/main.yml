@@ -11,7 +11,7 @@
       - slirp4netns
     state: present
   become: true
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 # ── Install Podman and build tools (Debian) ──────────────────────────────────
 # Debian 13 ships Podman 5.x natively; no third-party repository is required.
@@ -25,7 +25,7 @@
     state: present
     update_cache: true
   become: true
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 # ── Debian: cgroupfs manager + overlay storage driver ────────────────────────
 # When Podman runs inside cloud-init (no systemd user session), crun tries to
@@ -37,16 +37,16 @@
 # provides a proper overlay driver for rootless containers.
 - name: Configure Podman engine (Debian)
   ansible.builtin.copy:
-    dest: "{{ ansible_env.HOME }}/.config/containers/containers.conf"
+    dest: "{{ ansible_facts['user_dir'] }}/.config/containers/containers.conf"
     content: |
       [engine]
       cgroup_manager = "cgroupfs"
     mode: "0644" # NOSONAR — non-sensitive Podman engine config; world-readable is intentional
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Configure Podman storage to use fuse-overlayfs (Debian)
   ansible.builtin.copy:
-    dest: "{{ ansible_env.HOME }}/.config/containers/storage.conf"
+    dest: "{{ ansible_facts['user_dir'] }}/.config/containers/storage.conf"
     content: |
       [storage]
       driver = "overlay"
@@ -54,13 +54,13 @@
       [storage.options.overlay]
       mount_program = "/usr/bin/fuse-overlayfs"
     mode: "0644" # NOSONAR — non-sensitive Podman storage config; world-readable is intentional
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 # ── SELinux boolean (RedHat only) ─────────────────────────────────────────────
 - name: Check SELinux boolean container_manage_cgroup (RedHat)
   ansible.builtin.command:
     cmd: getsebool container_manage_cgroup
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
   register: podman_sebool_check
   changed_when: false
 
@@ -68,7 +68,7 @@
   ansible.builtin.command:
     cmd: setsebool -P container_manage_cgroup on
   become: true
-  when: ansible_os_family == "RedHat" and 'on' not in podman_sebool_check.stdout
+  when: ansible_facts['os_family'] == "RedHat" and 'on' not in podman_sebool_check.stdout
   changed_when: true
 
 # ── Podman user socket ────────────────────────────────────────────────────────
