@@ -4,21 +4,21 @@
 # ── Install helper scripts ────────────────────────────────────────────────────
 - name: Create ~/.local/bin directory
   ansible.builtin.file:
-    path: "{{ ansible_user_dir }}/.local/bin"
+    path: "{{ ansible_facts['user_dir'] }}/.local/bin"
     state: directory
     mode: "0755" # NOSONAR — standard mode for a user bin directory; rootless single-user host
 
 - name: Install check-services.sh to ~/.local/bin/
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/scripts/check-services.sh"
-    dest: "{{ ansible_user_dir }}/.local/bin/check-services.sh"
+    dest: "{{ ansible_facts['user_dir'] }}/.local/bin/check-services.sh"
     remote_src: true
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 - name: Install pull-models.sh to ~/.local/bin/
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/scripts/pull-models.sh"
-    dest: "{{ ansible_user_dir }}/.local/bin/pull-models.sh"
+    dest: "{{ ansible_facts['user_dir'] }}/.local/bin/pull-models.sh"
     remote_src: true
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
@@ -29,14 +29,14 @@
 - name: Copy stack manifest to ~/.config/containers/systemd/
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/kube/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
-    dest: "{{ ansible_user_dir }}/.config/containers/systemd/stack.yml"
+    dest: "{{ ansible_facts['user_dir'] }}/.config/containers/systemd/stack.yml"
     remote_src: true
     mode: "0644" # NOSONAR — non-sensitive stack manifest; world-readable is intentional
 
 # ── Generate Ollama API key ───────────────────────────────────────────────────
 - name: Check if Ollama API key file exists
   ansible.builtin.stat:
-    path: "{{ ansible_user_dir }}/.config/ollama/api-key.env"
+    path: "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
   register: api_key_file
 
 - name: Generate Ollama API key
@@ -51,13 +51,13 @@
     - name: Write API key to file
       ansible.builtin.copy:
         content: "OLLAMA_API_KEY=sk-ollama-{{ api_key_raw.stdout }}\n"
-        dest: "{{ ansible_user_dir }}/.config/ollama/api-key.env"
+        dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
         mode: "0600"
 
 # ── Generate WebUI secret key ─────────────────────────────────────────────────
 - name: Check if WebUI secret key file exists
   ansible.builtin.stat:
-    path: "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
+    path: "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
   register: webui_secret_file
 
 - name: Generate WebUI secret key
@@ -72,13 +72,13 @@
     - name: Write WebUI secret to file
       ansible.builtin.copy:
         content: "WEBUI_SECRET_KEY={{ webui_secret_raw.stdout }}\n"
-        dest: "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
+        dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
         mode: "0600"
 
 # ── Generate Open Terminal API key ───────────────────────────────────────────
 - name: Check if Open Terminal API key file exists
   ansible.builtin.stat:
-    path: "{{ ansible_user_dir }}/.config/ollama/open-terminal-api-key.env"
+    path: "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
   register: open_terminal_key_file
 
 - name: Generate Open Terminal API key
@@ -93,13 +93,13 @@
     - name: Write Open Terminal API key to file
       ansible.builtin.copy:
         content: "OPEN_TERMINAL_API_KEY=sk-terminal-{{ open_terminal_key_raw.stdout }}\n"
-        dest: "{{ ansible_user_dir }}/.config/ollama/open-terminal-api-key.env"
+        dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
         mode: "0600"
 
 # ── Read secrets from files ───────────────────────────────────────────────────
 - name: Read Ollama API key
   ansible.builtin.command:
-    cmd: grep OLLAMA_API_KEY "{{ ansible_user_dir }}/.config/ollama/api-key.env"
+    cmd: grep OLLAMA_API_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
   register: api_key_line
   changed_when: false
 
@@ -109,7 +109,7 @@
 
 - name: Read WebUI secret key
   ansible.builtin.command:
-    cmd: grep WEBUI_SECRET_KEY "{{ ansible_user_dir }}/.config/ollama/webui-secret.env"
+    cmd: grep WEBUI_SECRET_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
   register: webui_secret_line
   changed_when: false
 
@@ -119,7 +119,7 @@
 
 - name: Read Open Terminal API key
   ansible.builtin.command:
-    cmd: grep OPEN_TERMINAL_API_KEY "{{ ansible_user_dir }}/.config/ollama/open-terminal-api-key.env"
+    cmd: grep OPEN_TERMINAL_API_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
   register: open_terminal_key_line
   changed_when: false
 
@@ -131,7 +131,7 @@
 - name: Render secrets YAML from template
   ansible.builtin.template:
     src: secrets.yml.j2
-    dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion-secrets.yml"
+    dest: "{{ ansible_facts['user_dir'] }}/.config/containers/systemd/llm-companion-secrets.yml"
     mode: "0600"
 
 # ── Apply secrets to Podman ───────────────────────────────────────────────────
@@ -140,7 +140,7 @@
   ansible.builtin.command:
     cmd: >
       podman play kube
-      {{ ansible_user_dir }}/.config/containers/systemd/llm-companion-secrets.yml
+      {{ ansible_facts['user_dir'] }}/.config/containers/systemd/llm-companion-secrets.yml
       --replace
   register: secrets_apply_result
   changed_when: "'Created' in secrets_apply_result.stdout"
@@ -149,7 +149,7 @@
 - name: Copy llm-companion.kube Quadlet unit
   ansible.builtin.copy:
     src: "{{ llm_project_dir }}/kube/llm-companion.kube"
-    dest: "{{ ansible_user_dir }}/.config/containers/systemd/llm-companion.kube"
+    dest: "{{ ansible_facts['user_dir'] }}/.config/containers/systemd/llm-companion.kube"
     remote_src: true
     mode: "0644" # NOSONAR — non-sensitive Quadlet unit file; world-readable is intentional
 
@@ -195,5 +195,5 @@
 
     - name: Run pull-models.sh
       ansible.builtin.command:
-        cmd: "{{ ansible_user_dir }}/.local/bin/pull-models.sh --yes"
+        cmd: "{{ ansible_facts['user_dir'] }}/.local/bin/pull-models.sh --yes"
       changed_when: true

@@ -7,7 +7,7 @@ llm_web_port: 8080
 
 # Directory containing the llm-companion project files on the TARGET host.
 # Ansible copies stack.yml from here. The Dockerfile must also be here.
-llm_project_dir: "{{ ansible_user_dir }}/llm-companion"
+llm_project_dir: "{{ ansible_facts['user_dir'] }}/llm-companion"
 
 # ── Model pulling ────────────────────────────────────────────────────────────
 # Set to true to have Ansible start the stack and pull models automatically.
