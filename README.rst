@@ -550,7 +550,7 @@ Configure OpenCode
 
    {
      "$schema": "https://opencode.ai/config.json",
-     "model": "ollama/qwen3-8b-16k",
+     "model": "ollama/qwen3.5-9b-16k",
      "provider": {
        "ollama": {
          "npm": "@ai-sdk/openai-compatible",
@@ -562,10 +562,10 @@ Configure OpenCode
            }
          },
          "models": {
-           "qwen3-8b-16k":         { "name": "Qwen3 8B — agentic (16k)",         "tools": true },
-           "qwen2.5-coder-7b-16k": { "name": "Qwen2.5-Coder 7B — reliable (16k)", "tools": true },
-           "ministral-3-8b-16k":   { "name": "Ministral-3 8B — vision (16k)",     "tools": true },
-           "ministral-3-3b-16k":   { "name": "Ministral-3 3B — fast (16k)",       "tools": true }
+           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k)", "tools": true },
+           "qwen2.5-coder-7b-16k": { "name": "Qwen2.5-Coder 7B — reliable (16k)",        "tools": true },
+           "deepseek-r1-8b-16k":   { "name": "DeepSeek-R1 8B — CPU reasoning (16k)",     "tools": false },
+           "gemma4-e4b-8k":        { "name": "Gemma 4 4B — vision/general (8k)",          "tools": true }
          }
        }
      }
