@@ -974,6 +974,16 @@ users:
     plain_text_passwd: ${VM_USER}
     ssh_authorized_keys:
       - ${SSH_PUB_KEY}
+
+# Set the hostname early via bootcmd, bypassing hostnamectl which requires
+# D-Bus. On Fedora 44 the system bus socket is not ready when cloud-init's
+# set_hostname module runs, causing it to fail and marking cloud-init-main
+# as failed. preserve_hostname suppresses that module entirely so only the
+# bootcmd path runs.
+preserve_hostname: true
+bootcmd:
+  - [/bin/sh, -c, "echo 'llm-companion' > /etc/hostname"]
+  - [/usr/bin/hostname, llm-companion]
 YAML
 
     cat > "${METADATA}" << YAML
