@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.qwen3-coder-30b — Qwen3-Coder 30B-A3B with 32k context
+#
+# MoE model: 30B total parameters, 3B active per token.
+# Replaces Qwen2.5-Coder 32B: faster token generation at the same VRAM cost.
+#
+# TARGET: NVIDIA CUDA host with ≥ 20 GB VRAM (e.g. RTX 3090 / 4090, A5000).
+#
+# Memory guide (Q4_K_M, ≈ 17 GB base — all experts must be loaded):
+#   16k ctx → ~19 GB total  → needs 20 GB VRAM
+#   32k ctx → ~21 GB total  → needs 24 GB VRAM
+#
+# Create with:
+#   podman cp Modelfile.qwen3-coder-30b ollama:/tmp/
+#   podman exec -it ollama ollama create qwen3-coder-30b-32k \
+#       -f /tmp/Modelfile.qwen3-coder-30b
+# =============================================================================
+
+FROM qwen3-coder:30b
+
+# 32k fits whole files + tool call history without truncation.
+# Drop to 16384 if you hit OOM on a 20 GB card.
+PARAMETER num_ctx 32768
+
+# Low temperature for deterministic, reliable code generation.
+PARAMETER temperature 0.15

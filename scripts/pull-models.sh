@@ -110,9 +110,9 @@ declare -a MODELS=(
     "Qwen2.5-Coder 14B|qwen2.5-coder:14b|0|10|32768||any|any_gpu|coding|Reliable tool-call format; mid-GPU tier; ~9 GB"
 
     # ── CUDA models (NVIDIA CUDA, ≥ 20 GB VRAM) ─────────────────────────────
-    # Larger coding model for the 24 GB VRAM tier; fills the gap between
-    # Devstral-Small-2 (16 GB gate) and smaller any_gpu models.
-    "Qwen2.5-Coder 32B|qwen2.5-coder:32b|0|20|32768||any|cuda|coding|Top open coding model; 24 GB tier; ~20 GB"
+    # MoE successor to Qwen2.5-Coder 32B: 30B total / 3B active → faster tokens
+    # at the same VRAM cost (~17 GB weights + KV cache ≈ 21 GB at 32k ctx).
+    "Qwen3-Coder 30B A3B|qwen3-coder:30b|0|20|32768||any|cuda|coding|MoE 30B/3B-active; replaces Qwen2.5-Coder 32B; faster at equal VRAM; ~17 GB"
 
     # Best open reasoning model at the 24 GB VRAM tier; chain-of-thought native.
     "DeepSeek-R1 32B|deepseek-r1:32b|0|20|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB"
@@ -126,8 +126,9 @@ declare -a MODELS=(
     # Most reliable tool-call format compatibility — use if Qwen3 breaks tools.
     "Qwen2.5-Coder 7B|qwen2.5-coder:7b|6|0|16384||x86_64|cpu|coding|Most reliable tool-call format; ~4.5 GB"
 
-    # Best open reasoning model at the 6 GB CPU tier; chain-of-thought native.
-    "DeepSeek-R1 7B|deepseek-r1:7b|6|0|16384||x86_64|cpu|general|Best CPU reasoning; chain-of-thought; ~5 GB"
+    # R1-0528 update distilled into Qwen3-8B backbone — stronger reasoning than
+    # the original 7B distill at nearly the same RAM cost.
+    "DeepSeek-R1 8B|deepseek-r1:8b|6|0|16384||x86_64|cpu|general|R1-0528 Qwen3-8B distill; stronger reasoning than original 7B; ~5 GB"
 
     # ── Any-arch CPU models (4 GB RAM) ─────────────────────────────────────
     # Smallest vision-capable model; also useful as a fast general fallback.
@@ -160,11 +161,11 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "devstral-small-2:24b" "qwen2.5-coder:32b" "qwen2.5-coder:14b" "qwen3.5:9b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
+CODING_PRIORITY=(     "devstral-small-2:24b" "qwen3-coder:30b" "qwen2.5-coder:14b" "qwen3.5:9b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
 # shellcheck disable=SC2034
 VISION_PRIORITY=(     "ministral-3:14b"      "qwen3.5:9b" "gemma4:e4b" "ministral-3:3b" "moondream:1.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3.5:9b" "deepseek-r1:7b" "gemma4:e4b" "ministral-3:3b" "qwen3:1.7b" )
+GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3.5:9b" "deepseek-r1:8b" "gemma4:e4b" "ministral-3:3b" "qwen3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
 
