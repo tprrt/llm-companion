@@ -264,6 +264,34 @@ Embedding — RAG / document search (Open WebUI)
 
 Switch models inside OpenCode at any time with ``/models``.
 
+Cloud fallbacks — when the local stack is unavailable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When Ollama is unreachable (stack down, travelling, constrained device),
+OpenCode can route to a cloud provider instead. Add them alongside the
+``ollama`` provider in ``opencode.json`` and switch with ``/models``.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Provider
+     - Model ID
+     - Strength
+   * - Anthropic
+     - ``anthropic/claude-sonnet-4-6``
+     - Best tool-use + coding; direct cloud equivalent of Devstral
+   * - Anthropic
+     - ``anthropic/claude-haiku-4-5``
+     - Fast and cheap; good for quick Q&A and light tasks
+   * - GitHub Copilot
+     - ``github/gpt-4o``
+     - Strong general + coding; available on most Copilot plans
+   * - GitHub Copilot
+     - ``github/o3-mini``
+     - Reasoning-focused; cloud equivalent of DeepSeek-R1
+
+See the `Configure OpenCode`_ section for the provider configuration.
+
 ----
 
 Setup
@@ -572,6 +600,36 @@ Configure OpenCode
    }
 
 Replace ``<server-ip>`` with your LAN IP or Tailscale/WireGuard address.
+
+To add cloud fallbacks, extend the ``provider`` block:
+
+.. code-block:: json
+
+   "anthropic": {
+     "options": {
+       "apiKey": "sk-ant-..."
+     },
+     "models": {
+       "claude-sonnet-4-6": { "name": "Claude Sonnet 4.6 (cloud)", "tools": true },
+       "claude-haiku-4-5":  { "name": "Claude Haiku 4.5 (cloud)",  "tools": true }
+     }
+   },
+   "github": {
+     "npm": "@ai-sdk/openai-compatible",
+     "name": "GitHub Copilot",
+     "options": {
+       "baseURL": "https://models.inference.ai.azure.com",
+       "headers": { "Authorization": "Bearer <github-pat>" }
+     },
+     "models": {
+       "gpt-4o":  { "name": "Copilot GPT-4o (cloud)",  "tools": true },
+       "o3-mini": { "name": "Copilot o3-mini (cloud)", "tools": true }
+     }
+   }
+
+The ``github-pat`` needs the ``models:read`` scope (GitHub → Settings → Developer
+settings → Personal access tokens). Switch between local and cloud with ``/model``
+inside OpenCode at any time.
 
 AMD Radeon GPU (x86-64)
 ~~~~~~~~~~~~~~~~~~~~~~~~
