@@ -96,32 +96,37 @@ fi
 
 declare -a MODELS=(
     # ── GPU models ──────────────────────────────────────────────────────────
-    # Best-in-class for agentic SWE work; requires a GPU with ≥ 16 GB VRAM.
+    # Best-in-class for agentic SWE work; requires a GPU with ≥ 20 GB VRAM.
     # ctx=32768: Devstral is purpose-built for multi-file agentic editing; the
     # larger context window (vs 16384 for CPU models) fits whole files + tool
-    # call history without truncation. GPU VRAM makes the extra KV cache
-    # (~2 GB over 16k) affordable; CPU hosts use 16k to avoid OOM.
-    "Devstral-Small-2 24B|devstral-small-2:24b|0|16|32768||any|any_gpu|coding|SWE-bench leader, purpose-built agentic coding, ~15 GB"
+    # call history without truncation. Actual Q4_K_M weight is 15 GB; the 20 GB
+    # gate leaves ~5 GB headroom for KV cache at 32k context.
+    "Devstral-Small-2 24B|devstral-small-2:24b|0|20|32768||any|any_gpu|coding|SWE-bench leader, purpose-built agentic coding, ~15 GB weights"
 
     # Best GPU general + vision model; complements Devstral on the same host.
-    "Ministral-3 14B|ministral-3:14b|0|14|16384||any|any_gpu|vision,general|High-quality Ministral; vision; ~9 GB"
+    "Ministral-3 14B|ministral-3:14b|0|14|16384||any|any_gpu|vision,general|High-quality Ministral; vision; ~9.1 GB"
 
-    # Best GPU coding model for hosts with 10–15 GB VRAM (fills Devstral gap).
-    "Qwen2.5-Coder 14B|qwen2.5-coder:14b|0|10|32768||any|any_gpu|coding|Reliable tool-call format; mid-GPU tier; ~9 GB"
+    # Best GPU coding model for hosts with 14–19 GB VRAM (fills Devstral gap).
+    # Actual Q4_K_M weight is 9.0 GB; the 32768 context needs more KV cache
+    # headroom than Ministral-3 14B's 16384, so the gate matches Ministral's 14.
+    "Qwen2.5-Coder 14B|qwen2.5-coder:14b|0|14|32768||any|any_gpu|coding|Reliable tool-call format; mid-GPU tier; ~9 GB weights"
 
-    # ── CUDA models (NVIDIA CUDA, ≥ 20 GB VRAM) ─────────────────────────────
+    # ── CUDA models (NVIDIA CUDA, ≥ 24 GB VRAM) ─────────────────────────────
     # MoE successor to Qwen2.5-Coder 32B: 30B total / 3B active → faster tokens
-    # at the same VRAM cost (~17 GB weights + KV cache ≈ 21 GB at 32k ctx).
-    "Qwen3-Coder 30B A3B|qwen3-coder:30b|0|20|32768||any|cuda|coding|MoE 30B/3B-active; replaces Qwen2.5-Coder 32B; faster at equal VRAM; ~17 GB"
+    # at the same VRAM cost. Actual Q4_K_M weight is 19 GB; real-world guidance
+    # puts practical VRAM need at 21-25 GB with KV cache at 32k ctx, so gate at 24.
+    "Qwen3-Coder 30B A3B|qwen3-coder:30b|0|24|32768||any|cuda|coding|MoE 30B/3B-active; replaces Qwen2.5-Coder 32B; faster at equal VRAM; ~19 GB weights"
 
     # Best open reasoning model at the 24 GB VRAM tier; chain-of-thought native.
-    "DeepSeek-R1 32B|deepseek-r1:32b|0|20|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB"
+    # See modelfiles/Modelfile.deepseek-r1-32b: 20 GB weights + KV cache at
+    # 32k ctx needs 24 GB VRAM (tight on 24 GB cards).
+    "DeepSeek-R1 32B|deepseek-r1:32b|0|24|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB weights"
 
     # ── x86_64 CPU models (8 GB+ RAM) ──────────────────────────────────────
     # Best open agentic model at the 8 GB CPU tier; native multimodal (vision
     # built-in). Replaces both Qwen3 8B (coding+general) and Ministral-3 8B
     # (vision) with a single model. Thinking disabled for tool calls.
-    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks; ~5.5 GB"
+    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks; ~6.6 GB"
 
     # Most reliable tool-call format compatibility — use if Qwen3 breaks tools.
     "Qwen2.5-Coder 7B|qwen2.5-coder:7b|6|0|16384||x86_64|cpu|coding|Most reliable tool-call format; ~4.5 GB"
@@ -130,12 +135,16 @@ declare -a MODELS=(
     # the original 7B distill at nearly the same RAM cost.
     "DeepSeek-R1 8B|deepseek-r1:8b|6|0|16384||x86_64|cpu|general|R1-0528 Qwen3-8B distill; stronger reasoning than original 7B; ~5 GB"
 
+    # ── Any-arch CPU models (12 GB RAM) ─────────────────────────────────────
+    # Google Gemma 4 4B edge — native multimodal; clear upgrade over Gemma 3 4B.
+    # Actual Q4_K_M weight is 9.6 GB, not ~2.5 GB — the "4B" in "e4b" is
+    # *effective* (active) parameters, not on-disk weight size, so this needs
+    # more RAM than the 8 GB x86_64 tier above despite the smaller-sounding name.
+    "Gemma 4 4B|gemma4:e4b|12|0|8192||any|cpu|vision,general|Native multimodal; Gemma 4 edge model; strong reasoning; ~9.6 GB weights"
+
     # ── Any-arch CPU models (4 GB RAM) ─────────────────────────────────────
     # Smallest vision-capable model; also useful as a fast general fallback.
     "Ministral-3 3B|ministral-3:3b|4|0|16384||any|cpu|vision,general|Vision; 40+ languages; fast fallback; ~2 GB"
-
-    # Google Gemma 4 4B edge — native multimodal; clear upgrade over Gemma 3 4B.
-    "Gemma 4 4B|gemma4:e4b|4|0|8192||any|cpu|vision,general|Native multimodal; Gemma 4 edge model; strong reasoning; ~2.5 GB"
 
     # ── Any-arch CPU models (≤ 2 GB RAM) ───────────────────────────────────
     # Best code + tool-call model for constrained devices (ARM64, 2 GB+).
