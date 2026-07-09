@@ -110,7 +110,8 @@ Directory layout
 Model catalogue
 ---------------
 
-All models are Apache 2.0 licensed. Sizes are at Q4_K_M quantization.
+All models are Apache 2.0 licensed. Sizes are actual Q4_K_M on-disk weight
+sizes (not counting KV cache, which scales with context length).
 
 ``pull-models.sh`` auto-detects your architecture, GPU, and available RAM, then
 selects the **best fitting model per category** (coding, vision, general, embedding).
@@ -130,26 +131,31 @@ Coding — agentic tool use, multi-file edits
    * - ``devstral-small-2-32k``
      - ``devstral-small-2:24b``
      - ~15 GB
-     - GPU ≥ 16 GB VRAM
+     - GPU ≥ 20 GB VRAM
      - SWE-bench leader; purpose-built agentic coding
+   * - ``qwen3-coder-30b-32k``
+     - ``qwen3-coder:30b``
+     - ~19 GB
+     - NVIDIA CUDA ≥ 24 GB VRAM
+     - MoE 30B/3B-active; replaces Qwen2.5-Coder 32B; faster at equal VRAM
    * - ``qwen2.5-coder-14b-32k``
      - ``qwen2.5-coder:14b``
      - ~9 GB
-     - GPU ≥ 10 GB VRAM
+     - GPU ≥ 14 GB VRAM
      - Reliable tool-call format; mid-GPU tier
-   * - ``qwen3-8b-16k``
-     - ``qwen3:8b``
-     - ~5 GB
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Best agentic tool-use at 8 GB; ``/no_think`` baked in
+     - Native multimodal; best agentic tool-use at 8 GB
    * - ``qwen2.5-coder-7b-16k``
      - ``qwen2.5-coder:7b``
      - ~4.5 GB
      - x86_64 CPU, 6 GB RAM
-     - Most reliable tool-call format; Qwen3 fallback
-   * - ``qwen2.5-coder-1.5b-16k``
+     - Most reliable tool-call format; Qwen3.5 fallback
+   * - ``qwen2.5-coder-1.5b-4k``
      - ``qwen2.5-coder:1.5b``
-     - ~1 GB
+     - ~1.3 GB
      - any CPU, 2 GB RAM
      - Best code + tool-call at sub-2 GB (ARM64)
 
@@ -166,14 +172,19 @@ Vision — image / schematic input, multilingual
      - Strength
    * - ``ministral-3-14b-16k``
      - ``ministral-3:14b``
-     - ~9 GB
+     - ~9.1 GB
      - GPU ≥ 14 GB VRAM
      - High-quality vision + multilingual on GPU
-   * - ``ministral-3-8b-16k``
-     - ``ministral-3:8b``
-     - ~5 GB
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Vision; strong instruction following; multilingual
+     - Native multimodal; vision + strong instruction following
+   * - ``gemma4-e4b-8k``
+     - ``gemma4:e4b``
+     - ~9.6 GB
+     - any CPU, 12 GB RAM
+     - Native multimodal; Gemma 4 edge model; strong reasoning
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
      - ~2 GB
@@ -186,7 +197,7 @@ Vision — image / schematic input, multilingual
      - Smallest vision model; image Q&A on constrained devices
 
 General — chat, reasoning, quick one-shot questions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -196,39 +207,39 @@ General — chat, reasoning, quick one-shot questions
      - Disk
      - Gate
      - Strength
+   * - ``deepseek-r1-32b-32k``
+     - ``deepseek-r1:32b``
+     - ~20 GB
+     - NVIDIA CUDA ≥ 24 GB VRAM
+     - Top open reasoning; chain-of-thought; 24 GB tier
    * - ``ministral-3-14b-16k``
      - ``ministral-3:14b``
-     - ~9 GB
+     - ~9.1 GB
      - GPU ≥ 14 GB VRAM
      - High-quality general + vision on GPU
-   * - ``qwen3-8b-16k``
-     - ``qwen3:8b``
-     - ~5 GB
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Best general + agentic tool-use at 8 GB; ``/no_think`` baked in
-   * - ``deepseek-r1-7b-16k``
-     - ``deepseek-r1:7b``
+     - Native multimodal; best general + agentic tool-use at 8 GB
+   * - ``deepseek-r1-8b-16k``
+     - ``deepseek-r1:8b``
      - ~5 GB
      - x86_64 CPU, 6 GB RAM
-     - Best CPU reasoning; native chain-of-thought
-   * - ``ministral-3-8b-16k``
-     - ``ministral-3:8b``
-     - ~5 GB
-     - x86_64 CPU, 8 GB RAM
-     - Vision; strong instruction following; multilingual
-   * - ``gemma3-4b-8k``
-     - ``gemma3:4b``
-     - ~3 GB
-     - any CPU, 4 GB RAM
-     - Strong Google model; any arch; outperforms Qwen3 1.7B
+     - R1-0528 Qwen3-8B distill; best CPU reasoning
+   * - ``gemma4-e4b-8k``
+     - ``gemma4:e4b``
+     - ~9.6 GB
+     - any CPU, 12 GB RAM
+     - Native multimodal; Gemma 4 edge model; strong reasoning
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
      - ~2 GB
      - any CPU, 4 GB RAM
      - Vision; 40+ languages; fast fallback
-   * - ``qwen3-1.7b-16k``
+   * - ``qwen3-1.7b-4k``
      - ``qwen3:1.7b``
-     - ~1.1 GB
+     - ~1.5 GB
      - any CPU, 2 GB RAM
      - Best reasoning at sub-2 GB; ``/no_think`` baked in
 
@@ -257,10 +268,16 @@ Embedding — RAG / document search (Open WebUI)
 
 .. note::
 
-   **Qwen3 thinking mode:** ``qwen3`` variants bake in ``/no_think`` via a SYSTEM
-   prompt, disabling chain-of-thought blocks for faster, more predictable agentic
-   responses. Use the base ``qwen3:8b`` or ``qwen3:1.7b`` tag directly if you want
-   thinking mode.
+   **Gemma 4 "effective" parameters:** ``gemma4:e4b``'s "4B" refers to
+   *effective* (active) parameters, not on-disk weight size — the actual
+   Q4_K_M download is 9.6 GB, larger than some models with bigger parameter
+   counts in their name. Its hardware gate (12 GB RAM) reflects the real size.
+
+.. note::
+
+   **Qwen3 thinking mode:** ``qwen3`` and ``qwen3.5`` variants bake in ``/no_think``
+   via a SYSTEM prompt where noted above, disabling chain-of-thought blocks for
+   faster, more predictable agentic responses.
 
 Switch models inside OpenCode at any time with ``/models``.
 
@@ -544,7 +561,7 @@ Pull models
 Hardware gate is based on total RAM minus a configurable reserve (default: 2 GB).
 
 On an 8 GB x86_64 CPU host (2 GB reserved), selects:
-``qwen3-8b-16k`` (coding), ``ministral-3-8b-16k`` (vision), ``qwen3-8b-16k`` (general, shared),
+``qwen3.5-9b-16k`` (coding, vision, and general — one model covers all three),
 ``nomic-embed-text-8k`` (embedding)
 
 Verify the proxy
@@ -866,7 +883,7 @@ SSH into the VM and run the pull script directly:
    sudo firewall-cmd --list-ports        # should show 8080/tcp
    curl http://localhost:8080/           # verify Caddy responds
 
-**Qwen3 8B produces** ``<think>…</think>`` **blocks inside OpenCode**
+**Qwen3.5 9B produces** ``<think>…</think>`` **blocks inside OpenCode**
 
-You are using the base ``qwen3:8b`` tag instead of ``qwen3-8b-16k``.
+You are using the base ``qwen3.5:9b`` tag instead of ``qwen3.5-9b-16k``.
 Check the ``"model"`` field in ``opencode.json``.
