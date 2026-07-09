@@ -4,8 +4,8 @@
 # =============================================================================
 # Modelfile.deepseek-r1-32b — DeepSeek-R1 32B with 32k context
 #
-# TARGET: NVIDIA CUDA host with ≥ 20 GB VRAM (e.g. RTX 3090 / 4090, A5000).
-# This model WILL NOT fit on a GPU with less than 20 GB VRAM.
+# TARGET: NVIDIA CUDA host with ≥ 24 GB VRAM (e.g. RTX 3090 / 4090, A5000).
+# This model WILL NOT fit on a GPU with less than 24 GB VRAM.
 #
 # Memory guide (Q4_K_M, ≈ 20 GB base):
 #   16k ctx → ~22 GB total  → needs 24 GB VRAM
