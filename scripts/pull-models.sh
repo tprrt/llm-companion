@@ -361,4 +361,4 @@ echo ""
 info "Installed models:"
 podman exec "${CONTAINER_NAME}" ollama list
 echo ""
-info "Done. Use the variant tags (e.g. qwen3-8b-16k) in opencode.json."
+info "Done. Use the variant tags (e.g. qwen3.5-9b-16k) in opencode.json."
