@@ -143,16 +143,16 @@ Coding — agentic tool use, multi-file edits
      - ~9 GB
      - GPU ≥ 14 GB VRAM
      - Reliable tool-call format; mid-GPU tier
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
-     - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal; best agentic tool-use at 8 GB
    * - ``qwen2.5-coder-7b-16k``
      - ``qwen2.5-coder:7b``
      - ~4.5 GB
      - x86_64 CPU, 6 GB RAM
-     - Most reliable tool-call format; Qwen3.5 fallback
+     - Most reliable tool-call format; fast default at 6 GB
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
+     - x86_64 CPU, 8 GB RAM
+     - Native multimodal, highest quality at 8 GB, but slow in Ollama today (see note)
    * - ``qwen2.5-coder-1.5b-4k``
      - ``qwen2.5-coder:1.5b``
      - ~1.3 GB
@@ -175,11 +175,6 @@ Vision — image / schematic input, multilingual
      - ~9.1 GB
      - GPU ≥ 14 GB VRAM
      - High-quality vision + multilingual on GPU
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
-     - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal; vision + strong instruction following
    * - ``gemma4-e4b-8k``
      - ``gemma4:e4b``
      - ~9.6 GB
@@ -190,6 +185,11 @@ Vision — image / schematic input, multilingual
      - ~2 GB
      - any CPU, 4 GB RAM
      - Vision; 40+ languages; fast fallback
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
+     - x86_64 CPU, 8 GB RAM
+     - Native multimodal, highest quality, but slow in Ollama today (see note)
    * - ``moondream-1.8b-2k``
      - ``moondream:1.8b``
      - ~1.1 GB
@@ -217,11 +217,6 @@ General — chat, reasoning, quick one-shot questions
      - ~9.1 GB
      - GPU ≥ 14 GB VRAM
      - High-quality general + vision on GPU
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
-     - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal; best general + agentic tool-use at 8 GB
    * - ``deepseek-r1-8b-16k``
      - ``deepseek-r1:8b``
      - ~5 GB
@@ -237,11 +232,17 @@ General — chat, reasoning, quick one-shot questions
      - ~2 GB
      - any CPU, 4 GB RAM
      - Vision; 40+ languages; fast fallback
+   * - ``qwen3.5-9b-16k``
+     - ``qwen3.5:9b``
+     - ~6.6 GB
+     - x86_64 CPU, 8 GB RAM
+     - Native multimodal, highest quality, but slow in Ollama today (see note)
    * - ``qwen3-1.7b-4k``
      - ``qwen3:1.7b``
      - ~1.5 GB
      - any CPU, 2 GB RAM
-     - Best reasoning at sub-2 GB; ``/no_think`` baked in
+     - Best reasoning at sub-2 GB; ``/no_think`` baked in; also always pulled
+       as the dedicated Open WebUI background-task model (see note)
 
 Embedding — RAG / document search (Open WebUI)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -265,6 +266,26 @@ Embedding — RAG / document search (Open WebUI)
    ``nomic-embed-text`` is not a chat model — it converts text to vectors for
    Open WebUI's RAG feature (document upload + semantic search). It runs silently
    in the background and is pulled on any hardware.
+
+.. note::
+
+   **Task model:** ``qwen3-1.7b-4k`` is always created, on every hardware tier,
+   regardless of which model wins the general category above. Open WebUI uses
+   it as ``TASK_MODEL`` for background jobs (chat title generation, web search
+   query rewriting) so those requests don't evict the main chat model from
+   memory.
+
+.. note::
+
+   **Qwen3.5 9B is slow in Ollama today:** its hybrid Gated-Delta-Network
+   (linear attention) layers are not yet well optimized by Ollama's bundled
+   llama.cpp — see `ollama/ollama#14579
+   <https://github.com/ollama/ollama/issues/14579>`_ and `#14861
+   <https://github.com/ollama/ollama/issues/14861>`_, which report 5-6x slower
+   generation than llama.cpp directly, on both CPU and GPU. ``pull-models.sh``
+   therefore ranks it last in each category (an explicit opt-in via
+   ``--all`` or ``ollama pull qwen3.5:9b`` rather than the automatic "best"
+   pick) until upstream support matures.
 
 .. note::
 
@@ -560,9 +581,12 @@ Pull models
 / NVIDIA CUDA), and available RAM, then selects the **best fitting model per category**.
 Hardware gate is based on total RAM minus a configurable reserve (default: 2 GB).
 
-On an 8 GB x86_64 CPU host (2 GB reserved), selects:
-``qwen3.5-9b-16k`` (coding, vision, and general — one model covers all three),
-``nomic-embed-text-8k`` (embedding)
+On an 8 GB x86_64 CPU host (2 GB reserved, 6 GB effective), selects:
+``qwen2.5-coder-7b-16k`` (coding), ``ministral-3-3b-16k`` (vision),
+``deepseek-r1-8b-16k`` (general), ``qwen3-1.7b-4k`` (task model, always pulled),
+``nomic-embed-text-8k`` (embedding). ``qwen3.5:9b`` would also fit at this tier
+but is ranked last per-category due to its current Ollama slowness (see note
+above) — pull it explicitly with ``--all`` or by name if you want it anyway.
 
 Verify the proxy
 ^^^^^^^^^^^^^^^^
@@ -595,7 +619,7 @@ Configure OpenCode
 
    {
      "$schema": "https://opencode.ai/config.json",
-     "model": "ollama/qwen3.5-9b-16k",
+     "model": "ollama/qwen2.5-coder-7b-16k",
      "provider": {
        "ollama": {
          "npm": "@ai-sdk/openai-compatible",
@@ -607,10 +631,10 @@ Configure OpenCode
            }
          },
          "models": {
-           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k)", "tools": true },
            "qwen2.5-coder-7b-16k": { "name": "Qwen2.5-Coder 7B — reliable (16k)",        "tools": true },
            "deepseek-r1-8b-16k":   { "name": "DeepSeek-R1 8B — CPU reasoning (16k)",     "tools": false },
-           "gemma4-e4b-8k":        { "name": "Gemma 4 4B — vision/general (8k)",          "tools": true }
+           "gemma4-e4b-8k":        { "name": "Gemma 4 4B — vision/general (8k)",          "tools": true },
+           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k), slow (see note)", "tools": true }
          }
        }
      }

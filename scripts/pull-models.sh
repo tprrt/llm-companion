@@ -40,7 +40,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --all)        MODE="all";        shift ;;
         --list)       LIST_ONLY=true;    shift ;;
-        --reserve)    RESERVE_GB="$2";  shift 2 ;;
+        --reserve)    [[ $# -ge 2 ]] || die "--reserve requires a value"
+                      RESERVE_GB="$2";  shift 2 ;;
         --yes|-y)     CONFIRM_YES=true;  shift ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -123,10 +124,14 @@ declare -a MODELS=(
     "DeepSeek-R1 32B|deepseek-r1:32b|0|24|32768||any|cuda|general|Top open reasoning; chain-of-thought; 24 GB tier; ~20 GB weights"
 
     # ── x86_64 CPU models (8 GB+ RAM) ──────────────────────────────────────
-    # Best open agentic model at the 8 GB CPU tier; native multimodal (vision
-    # built-in). Replaces both Qwen3 8B (coding+general) and Ministral-3 8B
-    # (vision) with a single model. Thinking disabled for tool calls.
-    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks; ~6.6 GB"
+    # Highest-quality agentic model at the 8 GB CPU tier; native multimodal
+    # (vision built-in). Kept last in each priority list (not the default
+    # "best" pick) because Ollama's CPU kernels for its hybrid Gated-Delta-
+    # Network (linear attention) layers are still immature: ollama/ollama
+    # #14579 and #14861 report 5-6x slower generation than llama.cpp direct,
+    # on both CPU and GPU. Pull explicitly with `--all` or by name if you want
+    # the quality over the smaller single-purpose models ranked above it.
+    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks, but slow in Ollama today; ~6.6 GB"
 
     # Most reliable tool-call format compatibility — use if Qwen3 breaks tools.
     "Qwen2.5-Coder 7B|qwen2.5-coder:7b|6|0|16384||x86_64|cpu|coding|Most reliable tool-call format; ~4.5 GB"
@@ -170,13 +175,19 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "devstral-small-2:24b" "qwen3-coder:30b" "qwen2.5-coder:14b" "qwen3.5:9b" "qwen2.5-coder:7b" "qwen2.5-coder:1.5b" )
+CODING_PRIORITY=(     "devstral-small-2:24b" "qwen3-coder:30b" "qwen2.5-coder:14b" "qwen2.5-coder:7b" "qwen3.5:9b" "qwen2.5-coder:1.5b" )
 # shellcheck disable=SC2034
-VISION_PRIORITY=(     "ministral-3:14b"      "qwen3.5:9b" "gemma4:e4b" "ministral-3:3b" "moondream:1.8b" )
+VISION_PRIORITY=(     "ministral-3:14b"      "gemma4:e4b" "ministral-3:3b" "qwen3.5:9b" "moondream:1.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "qwen3.5:9b" "deepseek-r1:8b" "gemma4:e4b" "ministral-3:3b" "qwen3:1.7b" )
+GENERAL_PRIORITY=(    "deepseek-r1:32b" "ministral-3:14b" "deepseek-r1:8b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:9b" "qwen3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
+# TASK_MODEL (see stack.yml) needs a tiny model that is always created regardless
+# of hardware tier, independent of whichever model wins the categories above —
+# otherwise Open WebUI's title-generation / search-query background tasks 404
+# on hosts where the "best" general pick isn't qwen3:1.7b itself.
+# shellcheck disable=SC2034
+TASK_PRIORITY=(        "qwen3:1.7b" )
 
 # ── Hardware compatibility ────────────────────────────────────────────────────
 # model_fits: returns 0 if the model can run on this hardware, 1 otherwise.
@@ -244,7 +255,7 @@ declare -A PULL_USES    # tag → "use case" label shown in the table
 declare -a PULL_ORDER=()
 
 if [[ "$MODE" == "best" ]]; then
-    for pair in "coding:CODING_PRIORITY" "vision:VISION_PRIORITY" "general:GENERAL_PRIORITY" "embedding:EMBEDDING_PRIORITY"; do
+    for pair in "coding:CODING_PRIORITY" "vision:VISION_PRIORITY" "general:GENERAL_PRIORITY" "embedding:EMBEDDING_PRIORITY" "task:TASK_PRIORITY"; do
         use="${pair%%:*}"
         pvar="${pair##*:}"
         best=$(find_best "$pvar")
