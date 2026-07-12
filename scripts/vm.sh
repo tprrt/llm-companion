@@ -635,6 +635,10 @@ else
 fi
 
 mkdir -p "${VM_DIR}"
+# 0700: this directory holds the QEMU monitor socket, a full VM control
+# channel (arbitrary command execution, guest memory dumps) — keep it out of
+# reach of other local users on a shared/multi-user host.
+chmod 700 "${VM_DIR}"
 
 # ── build ─────────────────────────────────────────────────────────────────────
 if [[ "${SUBCMD}" == "build" ]]; then
@@ -876,7 +880,12 @@ YAML
         -drive    "file=${SEED_ISO},format=raw,if=virtio,readonly=on"
         -smbios   "type=1,serial=ds=nocloud"
         -virtfs   "local,path=${PROJECT_DIR},mount_tag=llm-companion,security_model=none,readonly=on"
-        -netdev   "user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${WEB_PORT}-:8080"
+        # 127.0.0.1 keeps guest SSH and the unauthenticated Open WebUI off the
+        # LAN — an empty host_addr (hostfwd=tcp::PORT-...) binds 0.0.0.0 on
+        # some QEMU builds, silently exposing both to every other host on the
+        # network despite every message here saying "localhost". Verify with
+        # `ss -tlnp` after `build`/`start` if this VM runs on a shared network.
+        -netdev   "user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22,hostfwd=tcp:127.0.0.1:${WEB_PORT}-:8080"
         -device   "virtio-net-pci,netdev=net0"
         -display  none
         -serial   "file:${CONSOLE_LOG}"
@@ -1047,7 +1056,8 @@ QEMU_CMD=(
     -drive    "file=${OVERLAY},format=qcow2,if=virtio"
     -drive    "file=${SEED_ISO},format=raw,if=virtio,readonly=on"
     -smbios   "type=1,serial=ds=nocloud"
-    -netdev   "user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${WEB_PORT}-:8080"
+    # 127.0.0.1: see the matching hostfwd comment in the build path above.
+    -netdev   "user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22,hostfwd=tcp:127.0.0.1:${WEB_PORT}-:8080"
     -device   "virtio-net-pci,netdev=net0"
     -display  none
     -serial   "file:${CONSOLE_LOG}"
