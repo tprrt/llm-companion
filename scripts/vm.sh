@@ -825,13 +825,17 @@ SETUP
     cat > "${USERDATA}" << YAML
 #cloud-config
 
+# SSH key is the only auth path: no password is set on the account (lock_passwd)
+# and password auth over SSH is explicitly disabled, so a guessable/no password
+# can't be exploited even if a host or image changes ssh_pwauth's default.
+ssh_pwauth: false
+
 users:
   - name: ${VM_USER}
     groups: ${VM_GROUPS}
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: ${VM_USER}
+    lock_passwd: true
     ssh_authorized_keys:
       - ${SSH_PUB_KEY}
 
@@ -998,13 +1002,15 @@ if [[ ! -f "${SEED_ISO}" ]]; then
     cat > "${USERDATA}" << YAML
 #cloud-config
 
+# SSH key is the only auth path: see the matching note in the build path.
+ssh_pwauth: false
+
 users:
   - name: ${VM_USER}
     groups: ${VM_GROUPS}
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
-    lock_passwd: false
-    plain_text_passwd: ${VM_USER}
+    lock_passwd: true
     ssh_authorized_keys:
       - ${SSH_PUB_KEY}
 
