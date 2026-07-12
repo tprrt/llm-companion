@@ -43,7 +43,10 @@ executors:
     resource_class: small
   docker-caddy:
     docker:
-      - image: caddy:2.9-alpine
+      # Keep in sync with the caddy version pinned in kube/stack.yml and
+      # kube/stack-rocm.yml, so `caddy validate` here reflects what actually
+      # runs in production.
+      - image: caddy:2.11.4-alpine
     resource_class: small
   docker-alpine:
     docker:
@@ -122,7 +125,9 @@ jobs:
   # ---------------------------------------------------------------------------
   ansible-lint:
     docker:
-      - image: ghcr.io/ansible/community-ansible-dev-tools:latest
+      # Pinned instead of :latest — an unpinned floating tag executes whatever
+      # image was silently pushed upstream since the last CI run.
+      - image: ghcr.io/ansible/community-ansible-dev-tools:v26.7.1
     resource_class: small
     steps:
       - checkout
@@ -141,11 +146,18 @@ jobs:
     steps:
       - checkout
       - run:
+          # Pinned to a specific release and checksum-verified instead of
+          # /releases/latest — an unpinned, unverified binary would execute
+          # whatever was most recently pushed upstream with no integrity check.
           name: Install kubeconform
           command: |
             apk add --no-cache curl
-            curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
-              | tar -xz -C /usr/local/bin kubeconform
+            KUBECONFORM_VERSION=v0.8.0
+            KUBECONFORM_SHA256=9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+            curl -sSLO "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+            echo "${KUBECONFORM_SHA256}  kubeconform-linux-amd64.tar.gz" | sha256sum -c -
+            tar -xz -C /usr/local/bin kubeconform -f kubeconform-linux-amd64.tar.gz
+            rm kubeconform-linux-amd64.tar.gz
       - run:
           name: Validate Kubernetes manifests
           command: kubeconform -strict -summary kube/stack.yml kube/stack-rocm.yml kube/llm-companion.kube
@@ -235,7 +247,7 @@ jobs:
             for f in \
               scripts/*.sh Dockerfile caddy/Caddyfile *.container *.network modelfiles/Modelfile.* \
               kube/*.yml kube/*.kube *.properties \
-              ansible/**/*.yml; do
+              $(find ansible -name '*.yml'); do
               [ -f "$f" ] || continue
               if ! grep -q "SPDX-License-Identifier:" "$f"; then
                 echo "MISSING SPDX header: $f"
