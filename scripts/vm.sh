@@ -283,12 +283,19 @@ wait_for_services() {
 }
 
 wait_for_ssh() {
+    local timeout=300 interval=5 elapsed=0
     step "Waiting for VM to boot (SSH)..."
-    until ssh_q true 2>/dev/null; do sleep 5; done
+    until ssh_q true 2>/dev/null; do
+        elapsed=$((elapsed + interval))
+        [[ ${elapsed} -ge ${timeout} ]] && \
+            die "VM did not become reachable over SSH after ${timeout}s. Check './vm.sh console' for boot errors."
+        sleep ${interval}
+    done
     info "SSH is up."
 }
 
 wait_for_service() {
+    local timeout=600 interval=10 elapsed=0
     step "Waiting for llm-companion service to become active..."
     local state running
     while true; do
@@ -313,7 +320,10 @@ wait_for_service() {
                 else
                     info "${state:-unknown} — no containers yet (image pull in progress)"
                 fi
-                sleep 10
+                elapsed=$((elapsed + interval))
+                [[ ${elapsed} -ge ${timeout} ]] && \
+                    die "llm-companion service did not become active after ${timeout}s. Run './vm.sh logs' for details."
+                sleep ${interval}
                 ;;
         esac
     done
@@ -649,6 +659,9 @@ if [[ "${SUBCMD}" == "build" ]]; then
         exit 0
     }
 
+    vm_is_running && \
+        die "A QEMU instance for '${NAME}' is already running (pid $(cat "${PID_FILE}")).\n  This is likely a provisioning VM left over from an interrupted build.\n  Stop it first: ./vm.sh stop --name ${NAME}"
+
     ISO_TOOL=""
     for t in genisoimage mkisofs xorriso; do
         command -v "$t" &>/dev/null && { ISO_TOOL="$t"; break; }
@@ -879,13 +892,24 @@ YAML
 
     tail -f "${CONSOLE_LOG}" | sed -u 's/\x1b\[[0-9;]*[A-Za-z]//g; s/\x1b[()]//g' &
     TAIL_PID=$!
-    trap 'kill "${TAIL_PID}" 2>/dev/null || true; stty sane 2>/dev/null || true' EXIT
+    # The provisioning QEMU instance is meant to be short-lived within this
+    # build run (it's shut down gracefully below once setup completes), so
+    # kill it here too on an abnormal exit (e.g. Ctrl-C mid-provisioning) —
+    # otherwise -daemonize leaves it running, holding the overlay disk and
+    # SSH_PORT/WEB_PORT, and colliding with the next `build` invocation.
+    trap 'kill "${TAIL_PID}" 2>/dev/null || true; [[ -f "${PID_FILE}" ]] && kill "$(cat "${PID_FILE}")" 2>/dev/null || true; stty sane 2>/dev/null || true' EXIT
 
     wait_for_ssh
     info "SSH is up — cloud-init setup is running (package upgrade + podman build, 10–20 min)."
 
     step "Waiting for Ansible provisioning to complete (polls every 20 s)..."
-    until ssh_q "test -f \$HOME/.llm-companion-setup-done" 2>/dev/null; do sleep 20; done
+    _setup_elapsed=0; _setup_timeout=2400
+    until ssh_q "test -f \$HOME/.llm-companion-setup-done" 2>/dev/null; do
+        _setup_elapsed=$((_setup_elapsed + 20))
+        [[ ${_setup_elapsed} -ge ${_setup_timeout} ]] && \
+            die "Provisioning did not finish after ${_setup_timeout}s. Check \$HOME/llm-setup.log in the VM (./vm.sh console)."
+        sleep 20
+    done
     info "Setup done — VM is rebooting to start llm-companion service."
 
     sleep 20
@@ -1079,7 +1103,10 @@ if [[ -n "${NOTIFY_SOCKET:-}" ]]; then
     systemd-notify --ready 2>/dev/null || true
     SSH_LOG_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
     [[ -f "${VM_SSH_KEY}" ]] && SSH_LOG_OPTS="${SSH_LOG_OPTS} -i ${VM_SSH_KEY}"
-    # exec replaces this shell; the EXIT trap fires here, cleaning up TAIL_PID.
+    # exec replaces this shell's process image, so the EXIT trap never fires
+    # here — kill the console-log tail pipeline explicitly first, otherwise
+    # it's orphaned on every service (re)start.
+    kill "${TAIL_PID}" 2>/dev/null || true
     # shellcheck disable=SC2086
     exec ssh ${SSH_LOG_OPTS} "${VM_USER}@127.0.0.1" 'journalctl --user -f --no-pager'
 fi
