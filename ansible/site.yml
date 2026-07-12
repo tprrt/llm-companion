@@ -11,4 +11,4 @@
     - common
     - firewall
     - podman
-    - llm-stack
+    - llm_stack

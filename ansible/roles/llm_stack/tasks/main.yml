@@ -37,20 +37,20 @@
 - name: Check if Ollama API key file exists
   ansible.builtin.stat:
     path: "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
-  register: api_key_file
+  register: llm_stack_api_key_file
 
 - name: Generate Ollama API key
-  when: not api_key_file.stat.exists
+  when: not llm_stack_api_key_file.stat.exists
   block:
     - name: Generate random hex key
       ansible.builtin.command:
         cmd: openssl rand -hex 24
-      register: api_key_raw
+      register: llm_stack_api_key_raw
       changed_when: false
 
     - name: Write API key to file
       ansible.builtin.copy:
-        content: "OLLAMA_API_KEY=sk-ollama-{{ api_key_raw.stdout }}\n"
+        content: "OLLAMA_API_KEY=sk-ollama-{{ llm_stack_api_key_raw.stdout }}\n"
         dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
         mode: "0600"
 
@@ -58,20 +58,20 @@
 - name: Check if WebUI secret key file exists
   ansible.builtin.stat:
     path: "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
-  register: webui_secret_file
+  register: llm_stack_webui_secret_file
 
 - name: Generate WebUI secret key
-  when: not webui_secret_file.stat.exists
+  when: not llm_stack_webui_secret_file.stat.exists
   block:
     - name: Generate random hex secret
       ansible.builtin.command:
         cmd: openssl rand -hex 32
-      register: webui_secret_raw
+      register: llm_stack_webui_secret_raw
       changed_when: false
 
     - name: Write WebUI secret to file
       ansible.builtin.copy:
-        content: "WEBUI_SECRET_KEY={{ webui_secret_raw.stdout }}\n"
+        content: "WEBUI_SECRET_KEY={{ llm_stack_webui_secret_raw.stdout }}\n"
         dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
         mode: "0600"
 
@@ -79,20 +79,20 @@
 - name: Check if Open Terminal API key file exists
   ansible.builtin.stat:
     path: "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
-  register: open_terminal_key_file
+  register: llm_stack_open_terminal_key_file
 
 - name: Generate Open Terminal API key
-  when: not open_terminal_key_file.stat.exists
+  when: not llm_stack_open_terminal_key_file.stat.exists
   block:
     - name: Generate random hex key
       ansible.builtin.command:
         cmd: openssl rand -hex 24
-      register: open_terminal_key_raw
+      register: llm_stack_open_terminal_key_raw
       changed_when: false
 
     - name: Write Open Terminal API key to file
       ansible.builtin.copy:
-        content: "OPEN_TERMINAL_API_KEY=sk-terminal-{{ open_terminal_key_raw.stdout }}\n"
+        content: "OPEN_TERMINAL_API_KEY=sk-terminal-{{ llm_stack_open_terminal_key_raw.stdout }}\n"
         dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
         mode: "0600"
 
@@ -100,32 +100,32 @@
 - name: Read Ollama API key
   ansible.builtin.command:
     cmd: grep OLLAMA_API_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/api-key.env"
-  register: api_key_line
+  register: llm_stack_api_key_line
   changed_when: false
 
 - name: Parse Ollama API key value
   ansible.builtin.set_fact:
-    llm_api_key: "{{ api_key_line.stdout | regex_replace('^OLLAMA_API_KEY=', '') }}"
+    llm_stack_api_key: "{{ llm_stack_api_key_line.stdout | regex_replace('^OLLAMA_API_KEY=', '') }}"
 
 - name: Read WebUI secret key
   ansible.builtin.command:
     cmd: grep WEBUI_SECRET_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/webui-secret.env"
-  register: webui_secret_line
+  register: llm_stack_webui_secret_line
   changed_when: false
 
 - name: Parse WebUI secret key value
   ansible.builtin.set_fact:
-    llm_webui_secret: "{{ webui_secret_line.stdout | regex_replace('^WEBUI_SECRET_KEY=', '') }}"
+    llm_stack_webui_secret: "{{ llm_stack_webui_secret_line.stdout | regex_replace('^WEBUI_SECRET_KEY=', '') }}"
 
 - name: Read Open Terminal API key
   ansible.builtin.command:
     cmd: grep OPEN_TERMINAL_API_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
-  register: open_terminal_key_line
+  register: llm_stack_open_terminal_key_line
   changed_when: false
 
 - name: Parse Open Terminal API key value
   ansible.builtin.set_fact:
-    llm_open_terminal_key: "{{ open_terminal_key_line.stdout | regex_replace('^OPEN_TERMINAL_API_KEY=', '') }}"
+    llm_stack_open_terminal_key: "{{ llm_stack_open_terminal_key_line.stdout | regex_replace('^OPEN_TERMINAL_API_KEY=', '') }}"
 
 # ── Render and place secrets YAML ─────────────────────────────────────────────
 - name: Render secrets YAML from template
@@ -142,8 +142,8 @@
       podman play kube
       {{ ansible_facts['user_dir'] }}/.config/containers/systemd/llm-companion-secrets.yml
       --replace
-  register: secrets_apply_result
-  changed_when: "'Created' in secrets_apply_result.stdout"
+  register: llm_stack_secrets_apply_result
+  changed_when: "'Created' in llm_stack_secrets_apply_result.stdout"
 
 # ── Quadlet .kube unit ────────────────────────────────────────────────────────
 - name: Copy llm-companion.kube Quadlet unit
@@ -188,10 +188,10 @@
       ansible.builtin.uri:
         url: "http://localhost:11434/"
         status_code: 200
-      register: ollama_ready
+      register: llm_stack_ollama_ready
       retries: 30
       delay: 5
-      until: ollama_ready.status == 200
+      until: llm_stack_ollama_ready.status == 200
 
     - name: Run pull-models.sh
       ansible.builtin.command:
