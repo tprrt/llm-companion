@@ -16,7 +16,7 @@
 #   OLLAMA_API_KEY=sk-ollama-<random>
 #
 # Use this key in opencode.json and anywhere else you call the Ollama API:
-#   "baseURL": "http://<server-ip>:8080/v1"
+#   "baseURL": "http://<server-ip>:8080/ollama/v1"
 #   Authorization: Bearer sk-ollama-<your-key>
 # =============================================================================
 
@@ -57,7 +57,7 @@ echo '  "provider": {'
 echo '    "ollama": {'
 echo '      "npm": "@ai-sdk/openai-compatible",'
 echo '      "options": {'
-echo '        "baseURL": "http://<server-ip>:8080/v1",' # NOSONAR — placeholder URL in printed usage example; no real HTTP connection is made
+echo '        "baseURL": "http://<server-ip>:8080/ollama/v1",' # NOSONAR — placeholder URL in printed usage example; no real HTTP connection is made
 echo '        "headers": {'
 echo '          "Authorization": "Bearer '"${KEY}"'"'
 echo '        }'
