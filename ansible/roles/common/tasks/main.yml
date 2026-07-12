@@ -13,25 +13,6 @@
     state: directory
     mode: "0700"
 
-- name: Create model storage directory ~/ollama-models
-  ansible.builtin.file:
-    path: "{{ ansible_facts['user_dir'] }}/ollama-models"
-    state: directory
-    mode: "0755" # NOSONAR — model storage directory; world-readable is intentional for rootless Podman access
-
-- name: Check SELinux label on ollama-models directory (RedHat only)
-  ansible.builtin.command:
-    cmd: ls -dZ "{{ ansible_facts['user_dir'] }}/ollama-models"
-  when: ansible_facts['os_family'] == "RedHat"
-  register: common_selinux_check
-  changed_when: false
-
-- name: Set SELinux label on ollama-models directory (RedHat only)
-  ansible.builtin.command:
-    cmd: chcon -Rt container_file_t "{{ ansible_facts['user_dir'] }}/ollama-models"
-  when: ansible_facts['os_family'] == "RedHat" and 'container_file_t' not in common_selinux_check.stdout
-  changed_when: true
-
 - name: Check if loginctl linger is enabled
   ansible.builtin.command:
     cmd: loginctl show-user {{ ansible_facts['user_id'] }} --property=Linger
