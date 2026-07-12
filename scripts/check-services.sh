@@ -51,9 +51,16 @@ pod_health_check() {
 }
 
 http_check() {
-    local name="$1" url="$2" extra_args=("${@:3}")
+    local name="$1" url="$2" bearer="${3:-}"
     local code
-    code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "${extra_args[@]}" "$url" 2>/dev/null || true)
+    # Bearer token (if any) is fed to curl via -K - (config from stdin) rather
+    # than -H on the command line, so it never appears in `ps`/`/proc/*/cmdline`.
+    if [[ -n "${bearer}" ]]; then
+        code=$(printf 'header = "Authorization: Bearer %s"\n' "${bearer}" \
+            | curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" -K - "$url" 2>/dev/null || true)
+    else
+        code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
+    fi
     if [[ "$code" == "200" ]]; then
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — HTTP ${code}"
         return 0
@@ -74,9 +81,7 @@ pod_health_check "llm-companion-caddy"         "Caddy"          || rc=1
 
 printf '%b── Via Caddy (:8080) ───────────────────────────────%b\n' "${CYAN}" "${NC}"
 http_check "Open WebUI (:8080/health)"    "http://localhost:8080/health"                              || rc=1
-http_check "Ollama     (:8080/ollama/)"   "http://localhost:8080/ollama/api/tags"                     \
-    -H "Authorization: Bearer ${OLLAMA_API_KEY}"                                                      || rc=1
-http_check "SearXNG    (:8080/searxng/)"  "http://localhost:8080/searxng/"                            \
-    -H "Authorization: Bearer ${OLLAMA_API_KEY}"                                                      || rc=1
+http_check "Ollama     (:8080/ollama/)"   "http://localhost:8080/ollama/api/tags"    "${OLLAMA_API_KEY}" || rc=1
+http_check "SearXNG    (:8080/searxng/)"  "http://localhost:8080/searxng/"           "${OLLAMA_API_KEY}" || rc=1
 
 exit "$rc"
