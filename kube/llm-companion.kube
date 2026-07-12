@@ -13,7 +13,7 @@
 #   mkdir -p ~/.config/containers/systemd
 #   cp llm-companion.kube ~/.config/containers/systemd/
 #   cp stack.yml          ~/.config/containers/systemd/
-#   # Generate secrets first (see ansible/roles/llm-stack/):
+#   # Generate secrets first (see ansible/roles/llm_stack/):
 #   # podman play kube ~/.config/containers/systemd/llm-companion-secrets.yml
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now llm-companion

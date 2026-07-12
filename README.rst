@@ -87,7 +87,7 @@ Directory layout
    │       ├── common/               # Dirs, linger, subuid/subgid
    │       ├── firewall/             # firewalld (Fedora) or ufw (Debian)
    │       ├── podman/               # Install Podman, SELinux boolean, build image
-   │       └── llm-stack/            # Copy manifest, generate secrets, enable service
+   │       └── llm_stack/            # Copy manifest, generate secrets, enable service
    │
    ├── caddy/
    │   └── Caddyfile                 # Canonical reference — embedded in kube/stack.yml ConfigMap
@@ -565,7 +565,7 @@ The playbook handles everything in order:
 - **common**: creates required directories, enables ``loginctl linger``, sets up subuid/subgid
 - **firewall**: opens port 8080 (firewalld on Fedora, ufw on Debian)
 - **podman**: installs Podman + buildah, sets SELinux boolean, builds the Ollama image
-- **llm-stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
+- **llm_stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
 
 Pull models
 ^^^^^^^^^^^
