@@ -366,10 +366,14 @@ spec:
         limits:
           cpu: 1000m
           memory: 512Mi
+      # NOTE: Open Terminal uses gosu to switch from root to the "user" account
+      # at startup. In rootless Podman with keep-id, the process starts as the
+      # host user (UID 1000) which lacks the effective CAP_SETUID needed by gosu.
+      # Running as UID 0 (user-namespace root — not actual system root) gives gosu
+      # the capability to call setuid(), after which the process drops back to the
+      # "user" account as intended.
       securityContext:
-        capabilities:
-          drop:
-            - ALL
+        runAsUser: 0
       volumeMounts:
         - name: open-terminal-data
           mountPath: /home/user
