@@ -201,6 +201,50 @@ spec:
   automountServiceAccountToken: false
   restartPolicy: Always
 
+  initContainers:
+    # Guards against stale pre-Alembic databases after an image upgrade.
+    # Open WebUI switched to Alembic-based migrations in the 0.x→0.9 series.
+    # Existing databases created before that switch have no alembic_version
+    # table; Open WebUI's own migration runner can't recover from that state
+    # and serves 500s instead of completing the migration.
+    # This container detects the missing-alembic_version condition and backs
+    # up + removes the database so Open WebUI initialises a clean schema on
+    # its next startup. It intentionally avoids importing the Open WebUI app
+    # (which would pull in the full dependency chain and OOM) and uses only
+    # stdlib sqlite3.
+    - name: open-webui-db-guard # NOSONAR — S6864/S6870/S6873/S6892/S6897 inapplicable
+      image: ghcr.io/open-webui/open-webui:v0.10.2 # keep in sync with the open-webui container below
+      command:
+        - python3
+        - -c
+        - |
+          import sqlite3, os, shutil
+          db = '/app/backend/data/webui.db'
+          if not os.path.exists(db):
+              print('No DB — fresh start, nothing to do')
+          else:
+              try:
+                  c = sqlite3.connect(db)
+                  c.execute('SELECT version_num FROM alembic_version').fetchone()
+                  c.close()
+                  print('Alembic tracking present — Open WebUI will apply any pending migrations on startup')
+              except sqlite3.OperationalError as e:
+                  bak = db + '.pre-alembic.bak'
+                  print(f'No alembic_version table ({e}): stale pre-Alembic DB detected')
+                  print(f'Backing up to {bak} and removing so Open WebUI initialises a clean schema')
+                  shutil.copy2(db, bak)
+                  os.remove(db)
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+      volumeMounts:
+        - name: open-webui-data
+          mountPath: /app/backend/data
+
   containers:
     # ── Ollama (ROCm GPU variant) ─────────────────────────────────────────────
     - name: ollama # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
@@ -324,6 +368,29 @@ spec:
         initialDelaySeconds: 30
         periodSeconds: 10
         timeoutSeconds: 10
+      # Verifies that Alembic migrations completed before liveness/readiness
+      # probes take over. /health returns 200 even with a broken schema, so
+      # this probe catches migration failures the HTTP probes would miss.
+      startupProbe:
+        exec:
+          command:
+            - python3
+            - -c
+            - |
+              import sqlite3, os, sys
+              db = '/app/backend/data/webui.db'
+              if not os.path.exists(db):
+                  sys.exit(0)
+              try:
+                  c = sqlite3.connect(db)
+                  c.execute('SELECT version_num FROM alembic_version').fetchone()
+                  c.close()
+              except Exception:
+                  sys.exit(1)
+        initialDelaySeconds: 5
+        failureThreshold: 3
+        periodSeconds: 10
+        timeoutSeconds: 5
       resources:
         requests:
           cpu: 100m
@@ -348,14 +415,20 @@ spec:
               name: llm-companion-secrets
               key: open-terminal-api-key
       livenessProbe:
-        tcpSocket:
-          port: 8000
+        exec:
+          command:
+            - sh
+            - -c
+            - "grep -q ':1F40 ' /proc/net/tcp /proc/net/tcp6 2>/dev/null"
         initialDelaySeconds: 10
         periodSeconds: 30
         timeoutSeconds: 5
       readinessProbe:
-        tcpSocket:
-          port: 8000
+        exec:
+          command:
+            - sh
+            - -c
+            - "grep -q ':1F40 ' /proc/net/tcp /proc/net/tcp6 2>/dev/null"
         initialDelaySeconds: 10
         periodSeconds: 10
         timeoutSeconds: 5
@@ -365,7 +438,7 @@ spec:
           memory: 64Mi
         limits:
           cpu: 1000m
-          memory: 512Mi
+          memory: 2Gi
       # NOTE: Open Terminal uses gosu to switch from root to the "user" account
       # at startup. In rootless Podman with keep-id, the process starts as the
       # host user (UID 1000) which lacks the effective CAP_SETUID needed by gosu.
@@ -393,14 +466,22 @@ spec:
         - name: INSTANCE_NAME
           value: "llm-companion"
       livenessProbe:
-        tcpSocket:
-          port: 8888
+        exec:
+          command:
+            - wget
+            - -qO
+            - /dev/null
+            - http://localhost:8888/
         initialDelaySeconds: 10
         periodSeconds: 30
         timeoutSeconds: 5
       readinessProbe:
-        tcpSocket:
-          port: 8888
+        exec:
+          command:
+            - wget
+            - -qO
+            - /dev/null
+            - http://localhost:8888/
         initialDelaySeconds: 10
         periodSeconds: 10
         timeoutSeconds: 5
@@ -410,7 +491,7 @@ spec:
           memory: 128Mi
         limits:
           cpu: 500m
-          memory: 256Mi
+          memory: 512Mi
       securityContext:
         capabilities:
           drop:

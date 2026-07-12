@@ -432,7 +432,7 @@ spec:
           memory: 64Mi
         limits:
           cpu: 1000m
-          memory: 512Mi
+          memory: 2Gi
       # NOTE: Open Terminal uses gosu to switch from root to the "user" account
       # at startup. In rootless Podman with keep-id, the process starts as the
       # host user (UID 1000) which lacks the effective CAP_SETUID needed by gosu.
@@ -485,7 +485,7 @@ spec:
           memory: 128Mi
         limits:
           cpu: 500m
-          memory: 256Mi
+          memory: 512Mi
       securityContext:
         capabilities:
           drop:
