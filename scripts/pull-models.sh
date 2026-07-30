@@ -57,15 +57,29 @@ ACCEL="cpu"
 VRAM_GB=0
 ACCEL_LABEL="CPU only"
 
-if command -v rocm-smi &>/dev/null && rocm-smi &>/dev/null 2>&1; then
-    ACCEL="rocm"
-    VRAM_GB=$(rocm-smi --showmeminfo vram 2>/dev/null \
+# Same rules as detect-hardware.sh, which picks the image Ansible builds: an
+# SMI tool reporting less than GPU_MIN_VRAM_GB (e.g. an APU's shared
+# framebuffer) is not a usable GPU, and an unusable ROCm device must not hide
+# a real NVIDIA one.
+GPU_MIN_VRAM_GB=2
+ROCM_VRAM_GB=0
+CUDA_VRAM_GB=0
+if command -v rocm-smi &>/dev/null && rocm-smi &>/dev/null; then
+    ROCM_VRAM_GB=$(rocm-smi --showmeminfo vram 2>/dev/null \
         | awk '/Total Memory/ {sum += $NF} END {printf "%.0f", sum/1024/1024/1024}')
-    ACCEL_LABEL="AMD ROCm — ${VRAM_GB} GB VRAM"
-elif command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null 2>&1; then
-    ACCEL="cuda"
-    VRAM_GB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null \
+fi
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+    CUDA_VRAM_GB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null \
         | awk '{sum += $1} END {printf "%.0f", sum/1024}')
+fi
+
+if [[ ${ROCM_VRAM_GB} -ge ${GPU_MIN_VRAM_GB} ]]; then
+    ACCEL="rocm"
+    VRAM_GB="${ROCM_VRAM_GB}"
+    ACCEL_LABEL="AMD ROCm — ${VRAM_GB} GB VRAM"
+elif [[ ${CUDA_VRAM_GB} -ge ${GPU_MIN_VRAM_GB} ]]; then
+    ACCEL="cuda"
+    VRAM_GB="${CUDA_VRAM_GB}"
     ACCEL_LABEL="NVIDIA CUDA — ${VRAM_GB} GB VRAM"
 fi
 
