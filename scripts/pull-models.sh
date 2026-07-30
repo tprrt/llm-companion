@@ -57,7 +57,7 @@ ACCEL_LABEL="CPU only"
 if command -v rocm-smi &>/dev/null && rocm-smi &>/dev/null 2>&1; then
     ACCEL="rocm"
     VRAM_GB=$(rocm-smi --showmeminfo vram 2>/dev/null \
-        | awk '/Total Memory/ {sum += $NF} END {printf "%.0f", sum/1024/1024}')
+        | awk '/Total Memory/ {sum += $NF} END {printf "%.0f", sum/1024/1024/1024}')
     ACCEL_LABEL="AMD ROCm — ${VRAM_GB} GB VRAM"
 elif command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null 2>&1; then
     ACCEL="cuda"
