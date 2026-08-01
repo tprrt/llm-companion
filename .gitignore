@@ -11,6 +11,7 @@ llm-companion-secrets.yml
 
 # ── Ansible inventory — contains host-specific config ─────────────────────────
 ansible/inventory/hosts.yml
+ansible/inventory/host_vars/
 
 # ── VM test artifacts ─────────────────────────────────────────────────────────
 vm-test/
