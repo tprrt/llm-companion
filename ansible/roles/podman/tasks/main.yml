@@ -79,6 +79,70 @@
     state: started
     enabled: true
 
+# ── NVIDIA Container Toolkit (CUDA only) ──────────────────────────────────────
+# Podman's CDI (Container Device Interface) support needs the toolkit to
+# generate /etc/cdi/nvidia.yaml before kube/stack-cuda.yml's
+# resources.limits."nvidia.com/gpu=all" request can resolve to a real device.
+# Assumes the NVIDIA driver itself (nvidia-smi) is already installed by the
+# operator — same assumption already made for ROCm packages above.
+- name: Add NVIDIA Container Toolkit repo (RedHat)
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo
+    dest: /etc/yum.repos.d/nvidia-container-toolkit.repo
+    mode: "0644" # NOSONAR — standard repo file, world-readable is intentional
+  become: true
+  when: ollama_build_target == 'cuda' and ansible_facts['os_family'] == "RedHat"
+
+- name: Add NVIDIA Container Toolkit GPG key (Debian)
+  ansible.builtin.get_url:
+    url: https://nvidia.github.io/libnvidia-container/gpgkey
+    dest: /usr/share/keyrings/nvidia-container-toolkit-keyring.asc
+    mode: "0644" # NOSONAR — standard GPG key file, world-readable is intentional
+  become: true
+  when: ollama_build_target == 'cuda' and ansible_facts['os_family'] == "Debian"
+
+- name: Add NVIDIA Container Toolkit repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.asc] https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /"
+    filename: nvidia-container-toolkit
+    state: present
+  become: true
+  when: ollama_build_target == 'cuda' and ansible_facts['os_family'] == "Debian"
+
+- name: Install nvidia-container-toolkit (RedHat)
+  ansible.builtin.dnf:
+    name: nvidia-container-toolkit
+    state: present
+  become: true
+  when: ollama_build_target == 'cuda' and ansible_facts['os_family'] == "RedHat"
+
+- name: Install nvidia-container-toolkit (Debian)
+  ansible.builtin.apt:
+    name: nvidia-container-toolkit
+    state: present
+    update_cache: true
+  become: true
+  when: ollama_build_target == 'cuda' and ansible_facts['os_family'] == "Debian"
+
+- name: Check if a CDI spec already exists for NVIDIA
+  ansible.builtin.stat:
+    path: /etc/cdi/nvidia.yaml
+  register: podman_nvidia_cdi_check
+  when: ollama_build_target == 'cuda'
+
+- name: Generate CDI spec for NVIDIA GPUs
+  ansible.builtin.command:
+    cmd: nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+  become: true
+  when: ollama_build_target == 'cuda' and not podman_nvidia_cdi_check.stat.exists
+  changed_when: true
+
+- name: Verify the CDI spec exposes an all-GPUs device
+  ansible.builtin.command:
+    cmd: grep -q "nvidia.com/gpu=all" /etc/cdi/nvidia.yaml
+  when: ollama_build_target == 'cuda'
+  changed_when: false
+
 # ── Build Ollama image ────────────────────────────────────────────────────────
 - name: Check if Ollama image already exists
   ansible.builtin.command:
