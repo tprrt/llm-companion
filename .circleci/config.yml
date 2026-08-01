@@ -160,7 +160,7 @@ jobs:
             rm kubeconform-linux-amd64.tar.gz
       - run:
           name: Validate Kubernetes manifests
-          command: kubeconform -strict -summary kube/stack.yml kube/stack-rocm.yml kube/llm-companion.kube
+          command: kubeconform -strict -summary kube/stack.yml kube/stack-rocm.yml kube/stack-cuda.yml kube/llm-companion.kube
 
   # ---------------------------------------------------------------------------
   # check-caddyfile-sync — verify the canonical Caddyfile matches the copy
