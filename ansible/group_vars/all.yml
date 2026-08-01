@@ -15,7 +15,10 @@ llm_project_dir: "{{ ansible_facts['user_dir'] }}/llm-companion"
 llm_pull_models: false
 
 # ── Ollama build ──────────────────────────────────────────────────────────────
-# Build target: 'cpu' or 'rocm'
+# Build target: 'cpu', 'rocm', or 'cuda'.
+# This is the fallback default. scripts/setup-host.sh normally supplies a
+# per-host override via ansible/inventory/host_vars/<hostname>.yml based on
+# detected hardware — see scripts/detect-hardware.sh.
 ollama_build_target: cpu
 # Image tag after build
 ollama_image_tag: "ollama-{{ ollama_build_target }}:latest"
