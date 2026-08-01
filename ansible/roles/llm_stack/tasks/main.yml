@@ -23,12 +23,18 @@
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 # ── Copy stack manifest ───────────────────────────────────────────────────────
-# For ROCm builds, stack-rocm.yml is used as the source (it references
-# localhost/ollama-rocm:latest and enables privileged GPU access).
+# For ROCm builds, stack-rocm.yml is the source (references
+# localhost/ollama-rocm:latest, privileged GPU access).
+# For CUDA builds, stack-cuda.yml is the source (references
+# localhost/ollama-cuda:latest, CDI GPU device request).
 # The destination is always stack.yml so the Quadlet unit needs no change.
 - name: Copy stack manifest to ~/.config/containers/systemd/
   ansible.builtin.copy:
-    src: "{{ llm_project_dir }}/kube/stack{{ '-rocm' if ollama_build_target == 'rocm' else '' }}.yml"
+    src: >-
+      {{ llm_project_dir }}/kube/stack{{
+        '-rocm' if ollama_build_target == 'rocm'
+        else '-cuda' if ollama_build_target == 'cuda'
+        else '' }}.yml
     dest: "{{ ansible_facts['user_dir'] }}/.config/containers/systemd/stack.yml"
     remote_src: true
     mode: "0644" # NOSONAR — non-sensitive stack manifest; world-readable is intentional
