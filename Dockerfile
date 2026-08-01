@@ -6,8 +6,12 @@
 # Multi-arch ready: x86-64 (CPU), ROCm (AMD GPU), ARM64
 #
 # Build targets (via --target):
-#   cpu     → default, x86-64 CPU-only (current)
-#   rocm    → AMD GPU via ROCm (next step)
+#   cpu     → default, x86-64 CPU-only
+#   rocm    → AMD GPU via ROCm
+#   cuda    → NVIDIA GPU via CUDA (same base image as cpu — Ollama's
+#             official image already bundles CUDA runtime libraries;
+#             GPU access at runtime comes from the NVIDIA Container
+#             Toolkit + CDI, not from anything baked into this image)
 #
 # Both targets produce the same image layout, only the base differs.
 # ARM64 is handled transparently by buildah/podman --platform.
@@ -77,6 +81,35 @@ ENV OLLAMA_KEEP_ALIVE=10m
 
 # ROCm: make all GPU devices visible by default
 ENV ROCR_VISIBLE_DEVICES=all
+
+USER ${HOST_UID}:${HOST_GID}
+
+EXPOSE 11434
+
+# -----------------------------------------------------------------------------
+# Stage: cuda — NVIDIA GPU target
+# Same base image as cpu: the official ollama/ollama image already bundles
+# CUDA runtime libraries and detects a GPU automatically at runtime. Unlike
+# ROCm, no separate upstream image tag is needed — what makes CUDA actually
+# work is the NVIDIA Container Toolkit + CDI device request in
+# kube/stack-cuda.yml (see ansible/roles/podman for toolkit installation),
+# not anything in this stage.
+# Build with: podman build --target cuda -t ollama-cuda .
+# -----------------------------------------------------------------------------
+FROM docker.io/ollama/ollama:0.31.2 AS cuda
+
+ARG HOST_UID=1000
+ARG HOST_GID=1000
+
+RUN mkdir -p /var/lib/ollama/models \
+    && chown -R "${HOST_UID}":"${HOST_GID}" /var/lib/ollama
+
+VOLUME ["/var/lib/ollama/models"]
+
+ENV OLLAMA_MODELS=/var/lib/ollama/models
+ENV OLLAMA_HOST=0.0.0.0:11434
+ENV OLLAMA_CONTEXT_LENGTH=16384
+ENV OLLAMA_KEEP_ALIVE=10m
 
 USER ${HOST_UID}:${HOST_GID}
 
