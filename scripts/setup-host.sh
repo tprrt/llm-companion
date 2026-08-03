@@ -101,3 +101,29 @@ cat > "${HOST_VARS_FILE}" << EOF
 ollama_build_target: ${OLLAMA_BUILD_TARGET}
 EOF
 info "Wrote ${HOST_VARS_FILE}"
+
+# ── Run the Ansible playbook ──────────────────────────────────────────────────
+step "Running Ansible playbook..."
+if [[ "${MODE}" == "local" ]]; then
+    ANSIBLE_ARGS=(-c local -i "localhost," "${PROJECT_DIR}/ansible/site.yml")
+    [[ -n "${ANSIBLE_USER}" ]] && ANSIBLE_ARGS+=(-e "ansible_user=${ANSIBLE_USER}")
+    ansible-playbook "${ANSIBLE_ARGS[@]}"
+else
+    ansible-playbook -i "${HOSTS_FILE}" --limit "${INVENTORY_NAME}" "${PROJECT_DIR}/ansible/site.yml"
+fi
+info "Ansible playbook complete"
+
+# ── Start the service ─────────────────────────────────────────────────────────
+# The llm_stack role only *enables* the systemd service (it relies on a
+# cloud-init reboot to start cleanly in the VM flow — see that task's
+# comment). A bare-metal host has no pending reboot, so start it explicitly.
+step "Starting llm-companion service..."
+if [[ "${MODE}" == "local" ]]; then
+    systemctl --user start llm-companion
+else
+    ssh "${SSH_ARGS[@]}" "${SSH_HOST}" systemctl --user start llm-companion
+fi
+info "llm-companion service started"
+
+echo ""
+info "Done. Next step: ./scripts/pull-models.sh to pull models sized for this hardware."
