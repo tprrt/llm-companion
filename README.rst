@@ -14,7 +14,7 @@ llm-companion — Podman Kubernetes Pod stack for Fedora Server
 
 Rootless Ollama server for **Fedora Server 41+** and **Debian 13+**, managed via
 a single Kubernetes Pod manifest (``kube/stack.yml``) deployed by Ansible.
-Multi-arch ready: x86-64 (CPU + AMD ROCm GPU) and ARM64.
+Multi-arch ready: x86-64 (CPU, AMD ROCm or NVIDIA CUDA GPU) and ARM64.
 
 ----
 
@@ -71,11 +71,12 @@ Directory layout
 .. code-block::
 
    .
-   ├── Dockerfile                    # Multi-stage: cpu + rocm targets
+   ├── Dockerfile                    # Multi-stage: cpu, rocm and cuda targets
    │
    ├── kube/                         # Kubernetes Pod manifests and Quadlet unit
    │   ├── stack.yml                 # PVCs + ConfigMap + Pod (CPU variant)
    │   ├── stack-rocm.yml            # Same, AMD ROCm GPU variant
+   │   ├── stack-cuda.yml            # Same, NVIDIA CUDA GPU variant
    │   └── llm-companion.kube        # Quadlet .kube unit — manages the pod via systemd
    │
    ├── ansible/                      # Ansible playbook and roles
@@ -101,6 +102,8 @@ Directory layout
    │
    └── scripts/
        ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
+       ├── setup-host.sh             # Detect hardware, run the playbook, start the service
+       ├── detect-hardware.sh        # Print the accelerator and ollama_build_target
        ├── pull-models.sh            # Hardware-aware model pull + variant creation
        ├── generate-api-key.sh       # Create Bearer token for the Caddy proxy
        └── check-services.sh         # Health checks for the stack
@@ -744,6 +747,48 @@ Add to ``opencode.json`` models block:
    "devstral-small-2-32k":  { "name": "Devstral Small 2 — agentic (32k)",  "tools": true }
 
 Change default: ``"model": "ollama/devstral-small-2-32k"``
+
+NVIDIA GPU (x86-64)
+~~~~~~~~~~~~~~~~~~~
+
+Additional prerequisites
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   nvidia-smi   # confirm the driver is installed and the GPU is visible
+
+The NVIDIA Container Toolkit and its generated CDI spec are installed
+automatically by the Ansible ``podman`` role when ``ollama_build_target:
+cuda`` — no manual toolkit setup needed, only the driver itself.
+
+Run the Ansible playbook
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml \
+       -e "ollama_build_target=cuda"
+
+Or let ``scripts/setup-host.sh`` detect it automatically (see "Setup" above).
+
+This builds ``localhost/ollama-cuda:latest``, installs the NVIDIA Container
+Toolkit, generates a CDI spec, and deploys ``kube/stack-cuda.yml`` (which
+requests the GPU via ``resources.limits."nvidia.com/gpu=all": 1``) as the
+active stack manifest.
+
+Unlike the ROCm variant, this does **not** run the container in privileged
+mode — CDI grants access to only the GPU device, not the whole host.
+
+Pull GPU models
+^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
+
+Adds ``ministral-3-14b-16k`` and ``devstral-small-2-32k`` (same GPU-tier
+models as the ROCm path — see that section for the ``opencode.json`` entries).
 
 ARM64
 ~~~~~
