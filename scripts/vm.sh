@@ -768,12 +768,12 @@ echo "$(ts) Project files ready at /home/fedora/llm-companion"
 echo "$(ts) Installing ansible-core..."
 dnf install -y ansible-core
 echo "$(ts) ansible-core installed"
-echo "$(ts) Running Ansible playbook..."
+echo "$(ts) Running setup-host.sh..."
 sudo -u fedora bash -c '
     cd $HOME/llm-companion
-    ansible-playbook -c local -i "localhost," -e "ansible_user=fedora" ansible/site.yml
+    ./scripts/setup-host.sh --ansible-user fedora --no-start
 '
-echo "$(ts) Ansible playbook complete"
+echo "$(ts) setup-host.sh complete"
 touch /home/fedora/.llm-companion-setup-done
 chown fedora:fedora /home/fedora/.llm-companion-setup-done
 echo "$(ts) ── Setup complete ──────────────────────────────────────────────"
@@ -806,12 +806,12 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y ansible
 echo "$(ts) ansible-core installed"
-echo "$(ts) Running Ansible playbook..."
+echo "$(ts) Running setup-host.sh..."
 sudo -u debian bash -c '
     cd $HOME/llm-companion
-    ansible-playbook -c local -i "localhost," -e "ansible_user=debian" ansible/site.yml
+    ./scripts/setup-host.sh --ansible-user debian --no-start
 '
-echo "$(ts) Ansible playbook complete"
+echo "$(ts) setup-host.sh complete"
 touch /home/debian/.llm-companion-setup-done
 chown debian:debian /home/debian/.llm-companion-setup-done
 echo "$(ts) ── Setup complete ──────────────────────────────────────────────"

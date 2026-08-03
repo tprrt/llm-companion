@@ -32,12 +32,14 @@ HOST_VARS_DIR="${PROJECT_DIR}/ansible/inventory/host_vars"
 
 ANSIBLE_USER=""
 INVENTORY_NAME=""
+NO_START=false
 
 # shellcheck disable=SC2034
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --ansible-user) [[ $# -ge 2 ]] || die "--ansible-user requires a value"
                          ANSIBLE_USER="$2"; shift 2 ;;
+        --no-start)     NO_START=true; shift ;;
         -*) die "Unknown argument: $1" ;;
         *)  [[ -z "${INVENTORY_NAME}" ]] || die "Only one inventory hostname may be given (got a second: $1)"
             INVENTORY_NAME="$1"; shift ;;
@@ -117,13 +119,17 @@ info "Ansible playbook complete"
 # The llm_stack role only *enables* the systemd service (it relies on a
 # cloud-init reboot to start cleanly in the VM flow — see that task's
 # comment). A bare-metal host has no pending reboot, so start it explicitly.
-step "Starting llm-companion service..."
-if [[ "${MODE}" == "local" ]]; then
-    systemctl --user start llm-companion
+if $NO_START; then
+    info "Skipping service start (--no-start) — the caller will start it after any pending reboot."
 else
-    ssh "${SSH_ARGS[@]}" "${SSH_HOST}" systemctl --user start llm-companion
+    step "Starting llm-companion service..."
+    if [[ "${MODE}" == "local" ]]; then
+        systemctl --user start llm-companion
+    else
+        ssh "${SSH_ARGS[@]}" "${SSH_HOST}" systemctl --user start llm-companion
+    fi
+    info "llm-companion service started"
 fi
-info "llm-companion service started"
 
 echo ""
 info "Done. Next step: ./scripts/pull-models.sh to pull models sized for this hardware."
