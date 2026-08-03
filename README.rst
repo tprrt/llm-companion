@@ -567,6 +567,24 @@ The playbook handles everything in order:
 - **podman**: installs Podman + buildah, sets SELinux boolean, builds the Ollama image
 - **llm_stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
 
+Or use the hardware-aware setup script
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``scripts/setup-host.sh`` detects the target's CPU/RAM/accelerator (cpu / AMD
+ROCm / NVIDIA CUDA), writes the matching ``ollama_build_target`` to
+``ansible/inventory/host_vars/<hostname>.yml``, runs the playbook above, and
+starts the service — one command instead of three:
+
+.. code-block:: bash
+
+   ./scripts/setup-host.sh my-server   # hostname must match an entry in hosts.yml
+
+For local self-provisioning (no inventory needed):
+
+.. code-block:: bash
+
+   ./scripts/setup-host.sh
+
 Pull models
 ^^^^^^^^^^^
 
