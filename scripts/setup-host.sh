@@ -34,7 +34,6 @@ ANSIBLE_USER=""
 INVENTORY_NAME=""
 NO_START=false
 
-# shellcheck disable=SC2034
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --ansible-user) [[ $# -ge 2 ]] || die "--ansible-user requires a value"
@@ -109,6 +108,7 @@ step "Running Ansible playbook..."
 if [[ "${MODE}" == "local" ]]; then
     ANSIBLE_ARGS=(-c local -i "localhost," "${PROJECT_DIR}/ansible/site.yml")
     [[ -n "${ANSIBLE_USER}" ]] && ANSIBLE_ARGS+=(-e "ansible_user=${ANSIBLE_USER}")
+    ANSIBLE_ARGS+=(-e "ollama_build_target=${OLLAMA_BUILD_TARGET}")
     ansible-playbook "${ANSIBLE_ARGS[@]}"
 else
     ansible-playbook -i "${HOSTS_FILE}" --limit "${INVENTORY_NAME}" "${PROJECT_DIR}/ansible/site.yml"
