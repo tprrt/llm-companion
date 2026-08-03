@@ -745,6 +745,48 @@ Add to ``opencode.json`` models block:
 
 Change default: ``"model": "ollama/devstral-small-2-32k"``
 
+NVIDIA GPU (x86-64)
+~~~~~~~~~~~~~~~~~~~
+
+Additional prerequisites
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   nvidia-smi   # confirm the driver is installed and the GPU is visible
+
+The NVIDIA Container Toolkit and its generated CDI spec are installed
+automatically by the Ansible ``podman`` role when ``ollama_build_target:
+cuda`` — no manual toolkit setup needed, only the driver itself.
+
+Run the Ansible playbook
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml \
+       -e "ollama_build_target=cuda"
+
+Or let ``scripts/setup-host.sh`` detect it automatically (see "Setup" above).
+
+This builds ``localhost/ollama-cuda:latest``, installs the NVIDIA Container
+Toolkit, generates a CDI spec, and deploys ``kube/stack-cuda.yml`` (which
+requests the GPU via ``resources.limits."nvidia.com/gpu=all": 1``) as the
+active stack manifest.
+
+Unlike the ROCm variant, this does **not** run the container in privileged
+mode — CDI grants access to only the GPU device, not the whole host.
+
+Pull GPU models
+^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
+
+Adds ``ministral-3-14b-16k`` and ``devstral-small-2-32k`` (same GPU-tier
+models as the ROCm path — see that section for the ``opencode.json`` entries).
+
 ARM64
 ~~~~~
 
