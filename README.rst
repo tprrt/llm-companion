@@ -752,7 +752,7 @@ NVIDIA GPU (x86-64)
 ~~~~~~~~~~~~~~~~~~~
 
 Additional prerequisites
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -763,7 +763,7 @@ automatically by the Ansible ``podman`` role when ``ollama_build_target:
 cuda`` — no manual toolkit setup needed, only the driver itself.
 
 Run the Ansible playbook
-^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -781,7 +781,7 @@ Unlike the ROCm variant, this does **not** run the container in privileged
 mode — CDI grants access to only the GPU device, not the whole host.
 
 Pull GPU models
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
