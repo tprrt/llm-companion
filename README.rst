@@ -103,7 +103,8 @@ Directory layout
        ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
        ├── pull-models.sh            # Hardware-aware model pull + variant creation
        ├── generate-api-key.sh       # Create Bearer token for the Caddy proxy
-       └── check-services.sh         # Health checks for the stack
+       ├── check-services.sh         # Health checks for the stack
+       └── functional-tests.sh       # On-demand behavioral checks (real inference, search, auth)
 
 ----
 
@@ -627,6 +628,24 @@ Verify the proxy
    # SearXNG (same Bearer token as Ollama)
    curl -s -H "Authorization: Bearer $KEY" \
        'http://localhost:8080/searxng/search?q=test&format=json' | python3 -m json.tool
+
+Functional tests
+^^^^^^^^^^^^^^^^
+
+The commands above are a useful one-off manual check. For a repeatable,
+scriptable version — real inference through Ollama, a real SearXNG search,
+Caddy auth enforcement, and Open WebUI's connectivity to Ollama — run:
+
+.. code-block:: bash
+
+   ./scripts/functional-tests.sh                        # on the deployed host
+   ssh myhost 'bash -s' < scripts/functional-tests.sh    # bare-metal host, no repo checked out
+   ./scripts/vm.sh functional-check                      # against a running VM
+
+Requires a pulled model (``./scripts/pull-models.sh``) and the same
+``OLLAMA_API_KEY`` as ``check-services.sh``. Not installed by Ansible and not
+run in CI — it needs a live deployment with pulled models and network
+access, so it is meant to be run on demand, not as routine monitoring.
 
 Configure OpenCode
 ^^^^^^^^^^^^^^^^^^
