@@ -38,6 +38,10 @@ GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
 BASE_URL="http://localhost:8080"
 
+if [[ -z "${OLLAMA_API_KEY}" ]]; then
+    printf 'WARNING: no OLLAMA_API_KEY found at %s/.config/ollama/api-key.env — the authenticated Ollama and SearXNG checks below will fail with HTTP 401.\n' "${HOME}" >&2
+fi
+
 rc=0
 
 ok() {
@@ -89,7 +93,7 @@ step_ollama() {
     tags_json="${raw%$'\n'*}"
 
     if [[ "${tags_code}" != "200" ]]; then
-        fail "Ollama — no model pulled" "GET /ollama/api/tags returned HTTP ${tags_code:-<no response>}. Raw reply: ${tags_json}"
+        fail "Ollama — GET /api/tags" "GET /ollama/api/tags returned HTTP ${tags_code:-<no response>}. Raw reply: ${tags_json}"
         return
     fi
 
@@ -98,7 +102,9 @@ step_ollama() {
 import json, sys
 try:
     models = json.load(sys.stdin).get("models", [])
-    print(models[0]["name"] if models else "")
+    generative = [m for m in models if "embed" not in m["name"]]
+    chosen = generative or models
+    print(chosen[0]["name"] if chosen else "")
 except Exception:
     print("")
 ')
