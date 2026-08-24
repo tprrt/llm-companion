@@ -21,6 +21,10 @@
 #   logs      Stream the VM console log (tail -f)
 #   console   Open an SSH session into the running VM
 #   check     Check that all services are up and healthy (requires running VM)
+#   functional-check
+#             Run real behavioral checks against the running VM (Ollama
+#             inference, SearXNG search, Caddy auth, Open WebUI↔Ollama
+#             connectivity) — see scripts/functional-tests.sh for details
 #   enable    Install the systemd user unit, enable it, and activate linger
 #   disable   Disable the systemd user unit (unit file is kept)
 #
@@ -131,12 +135,12 @@ SUBCMD="${1:-start}"
 shift || true
 
 case "${SUBCMD}" in
-    build|start|stop|clean|mrproper|status|logs|console|check|enable|disable) ;;
+    build|start|stop|clean|mrproper|status|logs|console|check|functional-check|enable|disable) ;;
     --help|-h)
         sed -n '/^# Usage:/,/^# =/{ /^# =/d; s/^# \{0,1\}//; p }' "$0"
         exit 0
         ;;
-    *) echo "Unknown subcommand: ${SUBCMD}. Use: build start stop clean mrproper status logs console check enable disable"; exit 1 ;;
+    *) echo "Unknown subcommand: ${SUBCMD}. Use: build start stop clean mrproper status logs console check functional-check enable disable"; exit 1 ;;
 esac
 
 # ── Options ───────────────────────────────────────────────────────────────────
@@ -264,6 +268,15 @@ check_services() {
     vm_is_running || die "VM '${NAME}' is not running."
     step "Service health checks (via SSH)..."
     ssh_q "\$HOME/.local/bin/check-services.sh"
+}
+
+functional_check() {
+    vm_is_running || die "VM '${NAME}' is not running."
+    step "Functional tests (via SSH)..."
+    local opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
+    [[ -f "${VM_SSH_KEY}" ]] && opts="${opts} -i ${VM_SSH_KEY}"
+    # shellcheck disable=SC2086
+    ssh ${opts} "${VM_USER}@127.0.0.1" 'bash -s' < "${PROJECT_DIR}/scripts/functional-tests.sh"
 }
 
 wait_for_services() {
@@ -596,6 +609,12 @@ fi
 # ── check ─────────────────────────────────────────────────────────────────────
 if [[ "${SUBCMD}" == "check" ]]; then
     check_services
+    exit $?
+fi
+
+# ── functional-check ──────────────────────────────────────────────────────────
+if [[ "${SUBCMD}" == "functional-check" ]]; then
+    functional_check
     exit $?
 fi
 
