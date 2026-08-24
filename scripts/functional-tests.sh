@@ -56,12 +56,118 @@ fail() {
 # Prints "<body>\n<http_code>" for a Bearer-authenticated GET. Caller splits
 # on the last newline. The token is fed to curl via -K - (config from
 # stdin), not -H, so it never appears in ps/`/proc/*/cmdline`.
-# shellcheck disable=SC2329 # Interface for Tasks 2-4
 get_bearer() {
     local url="$1" maxtime="$2"
     printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
         | curl -s --connect-timeout 5 --max-time "${maxtime}" -K - \
             -w '\n%{http_code}' "${url}" 2>/dev/null
+}
+
+# Prints "<body>\n<http_code>". Returns curl's own exit status (non-zero on
+# timeout/connection failure — distinct from a non-200 HTTP response, which
+# is reflected in the printed http_code instead).
+post_json() {
+    local url="$1" json="$2" maxtime="$3"
+    local tmp
+    tmp=$(mktemp)
+    printf '%s' "${json}" > "${tmp}"
+    printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
+        | curl -s --connect-timeout 5 --max-time "${maxtime}" -K - \
+            -H "Content-Type: application/json" --data-binary "@${tmp}" \
+            -w '\n%{http_code}' "${url}" 2>/dev/null
+    local curl_rc=$?
+    rm -f "${tmp}"
+    return "${curl_rc}"
+}
+
+step_ollama() {
+    printf '%b── Ollama (inference) ──────────────────────────────%b\n' "${CYAN}" "${NC}"
+
+    local raw tags_code tags_json
+    raw=$(get_bearer "${BASE_URL}/ollama/api/tags" 10)
+    tags_code="${raw##*$'\n'}"
+    tags_json="${raw%$'\n'*}"
+
+    if [[ "${tags_code}" != "200" ]]; then
+        fail "Ollama — no model pulled" "GET /ollama/api/tags returned HTTP ${tags_code:-<no response>}. Raw reply: ${tags_json}"
+        return
+    fi
+
+    local model
+    model=$(printf '%s' "${tags_json}" | python3 -c '
+import json, sys
+try:
+    models = json.load(sys.stdin).get("models", [])
+    print(models[0]["name"] if models else "")
+except Exception:
+    print("")
+')
+
+    if [[ -z "${model}" ]]; then
+        fail "Ollama — no model pulled" "Run './scripts/pull-models.sh' first, then re-run this check."
+        return
+    fi
+
+    local gen_body
+    gen_body=$(python3 -c '
+import json, sys
+print(json.dumps({"model": sys.argv[1], "prompt": "Say OK.", "stream": False}))
+' "${model}")
+
+    local gen_raw curl_rc
+    gen_raw=$(post_json "${BASE_URL}/ollama/api/generate" "${gen_body}" 180)
+    curl_rc=$?
+
+    if [[ ${curl_rc} -ne 0 ]]; then
+        fail "Ollama — generate (${model})" "curl failed (exit ${curl_rc}) — request may have timed out during cold model load."
+        return
+    fi
+
+    local gen_code gen_json
+    gen_code="${gen_raw##*$'\n'}"
+    gen_json="${gen_raw%$'\n'*}"
+
+    if [[ "${gen_code}" != "200" ]]; then
+        fail "Ollama — generate (${model})" "HTTP ${gen_code}. Raw reply: ${gen_json}"
+        return
+    fi
+
+    local error response
+    error=$(printf '%s' "${gen_json}" | python3 -c '
+import json, sys
+try:
+    print(json.load(sys.stdin).get("error", ""))
+except Exception:
+    print("")
+')
+    response=$(printf '%s' "${gen_json}" | python3 -c '
+import json, sys
+try:
+    print(json.load(sys.stdin).get("response", ""))
+except Exception:
+    print("")
+')
+
+    if [[ -n "${error}" ]]; then
+        fail "Ollama — generate (${model})" "Ollama returned an error: ${error}"
+        return
+    fi
+
+    if [[ -z "${response}" ]]; then
+        fail "Ollama — generate (${model})" "Empty .response field. Raw reply: ${gen_json}"
+        return
+    fi
+
+    ok "Ollama — generate (${model}) — got a non-empty response"
+
+    # Unload the model so running this check doesn't leave VRAM/RAM state
+    # changed on a constrained host that wasn't already running it.
+    local unload_body
+    unload_body=$(python3 -c '
+import json, sys
+print(json.dumps({"model": sys.argv[1], "keep_alive": 0}))
+' "${model}")
+    post_json "${BASE_URL}/ollama/api/generate" "${unload_body}" 15 >/dev/null 2>&1 || true
 }
 
 step_auth() {
@@ -86,6 +192,7 @@ step_auth() {
     fi
 }
 
+step_ollama
 step_auth
 
 exit "${rc}"
