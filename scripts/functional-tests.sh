@@ -170,6 +170,34 @@ print(json.dumps({"model": sys.argv[1], "keep_alive": 0}))
     post_json "${BASE_URL}/ollama/api/generate" "${unload_body}" 15 >/dev/null 2>&1 || true
 }
 
+step_searxng() {
+    printf '%b── SearXNG (search) ────────────────────────────────%b\n' "${CYAN}" "${NC}"
+
+    local raw code json count
+    raw=$(get_bearer "${BASE_URL}/searxng/search?q=test&format=json" 20)
+    code="${raw##*$'\n'}"
+    json="${raw%$'\n'*}"
+
+    if [[ "${code}" != "200" ]]; then
+        fail "SearXNG — search" "HTTP ${code:-<no response>}. Raw reply: ${json}"
+        return
+    fi
+
+    count=$(printf '%s' "${json}" | python3 -c '
+import json, sys
+try:
+    print(len(json.load(sys.stdin).get("results", [])))
+except Exception:
+    print(0)
+')
+
+    if [[ "${count}" -gt 0 ]]; then
+        ok "SearXNG — search returned ${count} result(s)"
+    else
+        fail "SearXNG — search returned no results" "This can also mean the host lacks outbound internet access to reach upstream search engines, not necessarily a regression."
+    fi
+}
+
 step_auth() {
     printf '%b── Auth enforcement ────────────────────────────────%b\n' "${CYAN}" "${NC}"
 
@@ -193,6 +221,7 @@ step_auth() {
 }
 
 step_ollama
+step_searxng
 step_auth
 
 exit "${rc}"
