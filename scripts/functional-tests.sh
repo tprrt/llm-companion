@@ -198,6 +198,38 @@ except Exception:
     fi
 }
 
+step_open_webui() {
+    printf '%b── Open WebUI ──────────────────────────────────────%b\n' "${CYAN}" "${NC}"
+
+    local raw code body
+    raw=$(curl -s --connect-timeout 5 --max-time 10 -w '\n%{http_code}' "${BASE_URL}/" 2>/dev/null)
+    code="${raw##*$'\n'}"
+    body="${raw%$'\n'*}"
+
+    if [[ "${code}" == "200" ]] && printf '%s' "${body}" | grep -qi '<html'; then
+        ok "Open WebUI — frontend served (HTTP ${code})"
+    else
+        fail "Open WebUI — frontend served" "HTTP ${code:-<no response>}. First 200 bytes: $(printf '%s' "${body}" | head -c 200)"
+    fi
+
+    local exec_out
+    exec_out=$(podman exec llm-companion-open-webui python3 -c '
+import os, urllib.request
+url = os.environ.get("OLLAMA_BASE_URL", "").rstrip("/") + "/api/tags"
+try:
+    with urllib.request.urlopen(url, timeout=10) as r:
+        print(r.status)
+except Exception as e:
+    print("ERROR: " + str(e))
+' 2>&1)
+
+    if [[ "${exec_out}" == "200" ]]; then
+        ok "Open WebUI — reaches Ollama internally (OLLAMA_BASE_URL)"
+    else
+        fail "Open WebUI — reaches Ollama internally (OLLAMA_BASE_URL)" "${exec_out}"
+    fi
+}
+
 step_auth() {
     printf '%b── Auth enforcement ────────────────────────────────%b\n' "${CYAN}" "${NC}"
 
@@ -222,6 +254,7 @@ step_auth() {
 
 step_ollama
 step_searxng
+step_open_webui
 step_auth
 
 exit "${rc}"
