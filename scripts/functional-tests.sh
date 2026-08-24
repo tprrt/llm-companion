@@ -218,18 +218,25 @@ step_open_webui() {
         fail "Open WebUI — frontend served" "HTTP ${code:-<no response>}. First 200 bytes: $(printf '%s' "${body}" | head -c 200)"
     fi
 
-    local exec_out
+    local exec_out exec_last
     exec_out=$(podman exec llm-companion-open-webui python3 -c '
 import os, urllib.request
-url = os.environ.get("OLLAMA_BASE_URL", "").rstrip("/") + "/api/tags"
-try:
-    with urllib.request.urlopen(url, timeout=10) as r:
-        print(r.status)
-except Exception as e:
-    print("ERROR: " + str(e))
+base = os.environ.get("OLLAMA_BASE_URL", "")
+if not base:
+    print("ERROR: OLLAMA_BASE_URL not set in container")
+else:
+    url = base.rstrip("/") + "/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            print(r.status)
+    except Exception as e:
+        print("ERROR: " + str(e))
 ' 2>&1)
+    # Take the last line: stray stderr noise (e.g. a podman/cgroup warning)
+    # can precede the real result without meaning the check failed.
+    exec_last="${exec_out##*$'\n'}"
 
-    if [[ "${exec_out}" == "200" ]]; then
+    if [[ "${exec_last}" == "200" ]]; then
         ok "Open WebUI — reaches Ollama internally (OLLAMA_BASE_URL)"
     else
         fail "Open WebUI — reaches Ollama internally (OLLAMA_BASE_URL)" "${exec_out}"
@@ -256,11 +263,24 @@ step_auth() {
     else
         fail "Auth — wrong Bearer token rejected" "Expected HTTP 401, got HTTP ${code:-<no response>}"
     fi
+
+    # Caddy's matcher is `not header Authorization "Bearer {$OLLAMA_API_KEY}"`
+    # — if Caddy's own OLLAMA_API_KEY were ever empty, a literal empty
+    # Bearer token would match it and slip through. Check that directly
+    # rather than relying on the wrong-token case above to catch it.
+    code=$(printf 'header = "Authorization: Bearer "\n' \
+        | curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
+            "${BASE_URL}/ollama/api/tags" 2>/dev/null)
+    if [[ "${code}" == "401" ]]; then
+        ok "Auth — empty Bearer token rejected (HTTP ${code})"
+    else
+        fail "Auth — empty Bearer token rejected" "Expected HTTP 401, got HTTP ${code:-<no response>}"
+    fi
 }
 
-step_ollama
-step_searxng
-step_open_webui
 step_auth
+step_open_webui
+step_searxng
+step_ollama
 
 exit "${rc}"

@@ -273,10 +273,7 @@ check_services() {
 functional_check() {
     vm_is_running || die "VM '${NAME}' is not running."
     step "Functional tests (via SSH)..."
-    local opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p ${SSH_PORT}"
-    [[ -f "${VM_SSH_KEY}" ]] && opts="${opts} -i ${VM_SSH_KEY}"
-    # shellcheck disable=SC2086
-    ssh ${opts} "${VM_USER}@127.0.0.1" 'bash -s' < "${PROJECT_DIR}/scripts/functional-tests.sh"
+    ssh_q 'bash -s' < "${PROJECT_DIR}/scripts/functional-tests.sh"
 }
 
 wait_for_services() {
@@ -557,7 +554,8 @@ if [[ "${SUBCMD}" == "mrproper" ]]; then
 fi
 
 # ── Load conf for all remaining subcommands ───────────────────────────────────
-# start, status, logs, console, check, enable, disable all need the conf.
+# start, status, logs, console, check, functional-check, enable, disable
+# all need the conf.
 # build handles its own NAME defaulting and setup_vm_paths call.
 if [[ "${SUBCMD}" != "build" ]]; then
     [[ -z "${NAME}" ]] && auto_detect_name

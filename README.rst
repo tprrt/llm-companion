@@ -638,7 +638,7 @@ Caddy auth enforcement, and Open WebUI's connectivity to Ollama — run:
 
 .. code-block:: bash
 
-   ./scripts/functional-tests.sh                        # on the deployed host
+   ./scripts/functional-tests.sh                         # on the deployed host
    ssh myhost 'bash -s' < scripts/functional-tests.sh    # bare-metal host, no repo checked out
    ./scripts/vm.sh functional-check                      # against a running VM
 
