@@ -854,9 +854,9 @@ Updating the stack
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
 
    # Pull pinned images and replace the pod (bump version tags in kube/stack.yml first):
-   podman pull docker.io/library/caddy:2.11.4
-   podman pull ghcr.io/open-webui/open-webui:v0.10.2
-   podman pull docker.io/searxng/searxng:2026.7.7-f69b22c45
+   podman pull docker.io/library/caddy:2.11.7
+   podman pull ghcr.io/open-webui/open-webui:v0.11.4
+   podman pull docker.io/searxng/searxng:2026.10.7-6671d89be
    systemctl --user restart llm-companion
 
 ``AutoUpdate=registry`` in ``kube/llm-companion.kube`` also enables automatic updates via:
