@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.gemma4-12b — Gemma 4 12B with 16k context
+#
+# Mid-GPU vision + general model, for hosts below Qwen3.8 27B's 24 GB gate.
+# Complements Qwen2.5-Coder 14B: use this for general Q&A, vision tasks and
+# documentation; use the coding model for agentic sessions.
+#
+# Memory guide (Q4_K_M, ≈ 7.7 GB base):
+#   16k ctx → ~10 GB total → needs 12 GB VRAM
+#   32k ctx → ~12 GB total → needs 16 GB VRAM
+#
+# Create with:
+#   podman cp Modelfile.gemma4-12b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create gemma4-12b-16k \
+#       -f /tmp/Modelfile.gemma4-12b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM gemma4:12b
+
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.15

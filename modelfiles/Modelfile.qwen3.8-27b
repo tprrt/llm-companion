@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.qwen3.8-27b — Qwen3.8 27B with 32k context
+#
+# Dense 27B with vision, tool use and thinking: one model for coding, vision
+# and general use on a GPU host.
+#
+# TARGET: GPU host (AMD ROCm or NVIDIA CUDA) with ≥ 24 GB VRAM.
+#
+# Memory guide (Q4_K_M, ≈ 18 GB base):
+#   16k ctx → ~20 GB total  → needs 24 GB VRAM
+#   32k ctx → ~23 GB total  → needs 24 GB VRAM (tight on 24 GB cards)
+#
+# Create with:
+#   podman cp Modelfile.qwen3.8-27b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create qwen3.8-27b-32k \
+#       -f /tmp/Modelfile.qwen3.8-27b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM qwen3.8:27b
+
+# 32k is a good default for agentic use (whole files + tool context).
+# Drop to 16384 if you hit OOM on your GPU.
+PARAMETER num_ctx 32768
+
+# Low temperature for deterministic code / tool responses.
+PARAMETER temperature 0.15

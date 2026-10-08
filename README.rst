@@ -93,11 +93,12 @@ Directory layout
    │   └── Caddyfile                 # Canonical reference — embedded in kube/stack.yml ConfigMap
    │
    ├── modelfiles/                   # Manual alternatives to scripts/pull-models.sh
-   │   ├── Modelfile.ministral-3-8b
-   │   ├── Modelfile.ministral-3-14b
-   │   ├── Modelfile.qwen3-8b        # Thinking mode disabled for agentic use
-   │   ├── Modelfile.qwen2.5-coder
-   │   └── Modelfile.devstral-small-2
+   │   ├── Modelfile.qwen3.8-27b
+   │   ├── Modelfile.laguna-xs-2.1
+   │   ├── Modelfile.gemma4-12b
+   │   ├── Modelfile.gemma4-31b
+   │   ├── Modelfile.qwen3.5-9b      # Thinking mode disabled for agentic use
+   │   └── Modelfile.qwen2.5-coder
    │
    └── scripts/
        ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
@@ -111,7 +112,8 @@ Directory layout
 Model catalogue
 ---------------
 
-All models are Apache 2.0 licensed. Sizes are actual Q4_K_M on-disk weight
+All models are Apache 2.0 licensed except Laguna XS 2.1 (OpenMDW-1.1, also
+permissive for commercial use). Sizes are actual Q4_K_M on-disk weight
 sizes (not counting KV cache, which scales with context length).
 
 ``pull-models.sh`` auto-detects your architecture, GPU, and available RAM, then
@@ -129,16 +131,16 @@ Coding — agentic tool use, multi-file edits
      - Disk
      - Gate
      - Strength
-   * - ``devstral-small-2-32k``
-     - ``devstral-small-2:24b``
-     - ~15 GB
-     - GPU ≥ 20 GB VRAM
-     - SWE-bench leader; purpose-built agentic coding
-   * - ``qwen3-coder-30b-32k``
-     - ``qwen3-coder:30b``
-     - ~19 GB
+   * - ``qwen3.8-27b-32k``
+     - ``qwen3.8:27b``
+     - ~18 GB
+     - GPU ≥ 24 GB VRAM
+     - Newest Qwen; agentic coding + vision + thinking in a single model
+   * - ``laguna-xs-2.1-32k``
+     - ``laguna-xs-2.1``
+     - ~20 GB
      - NVIDIA CUDA ≥ 24 GB VRAM
-     - MoE 30B/3B-active; replaces Qwen2.5-Coder 32B; faster at equal VRAM
+     - MoE 33B/3B-active; agentic coding; faster than the dense 27B
    * - ``qwen2.5-coder-14b-32k``
      - ``qwen2.5-coder:14b``
      - ~9 GB
@@ -153,7 +155,7 @@ Coding — agentic tool use, multi-file edits
      - ``qwen3.5:9b``
      - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality at 8 GB, but slow in Ollama today (see note)
+     - Native multimodal, highest quality at 8 GB; CPU speed unverified (see note)
    * - ``qwen2.5-coder-1.5b-4k``
      - ``qwen2.5-coder:1.5b``
      - ~1.3 GB
@@ -171,15 +173,20 @@ Vision — image / schematic input, multilingual
      - Disk
      - Gate
      - Strength
-   * - ``ministral-3-14b-16k``
-     - ``ministral-3:14b``
-     - ~9.1 GB
-     - GPU ≥ 14 GB VRAM
-     - High-quality vision + multilingual on GPU
+   * - ``qwen3.8-27b-32k``
+     - ``qwen3.8:27b``
+     - ~18 GB
+     - GPU ≥ 24 GB VRAM
+     - Vision alongside coding and general use; one pull covers all three
+   * - ``gemma4-12b-16k``
+     - ``gemma4:12b``
+     - ~7.7 GB
+     - GPU ≥ 12 GB VRAM
+     - Native multimodal; mid-GPU tier
    * - ``gemma4-e4b-8k``
      - ``gemma4:e4b``
-     - ~9.6 GB
-     - any CPU, 12 GB RAM
+     - ~6.6 GB
+     - any CPU, 9 GB RAM
      - Native multimodal; Gemma 4 edge model; strong reasoning
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
@@ -190,7 +197,7 @@ Vision — image / schematic input, multilingual
      - ``qwen3.5:9b``
      - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality, but slow in Ollama today (see note)
+     - Native multimodal, highest quality; CPU speed unverified (see note)
    * - ``moondream-1.8b-2k``
      - ``moondream:1.8b``
      - ~1.1 GB
@@ -208,16 +215,21 @@ General — chat, reasoning, quick one-shot questions
      - Disk
      - Gate
      - Strength
-   * - ``deepseek-r1-32b-32k``
-     - ``deepseek-r1:32b``
-     - ~20 GB
+   * - ``qwen3.8-27b-32k``
+     - ``qwen3.8:27b``
+     - ~18 GB
+     - GPU ≥ 24 GB VRAM
+     - Thinking model; best general pick at the 24 GB tier
+   * - ``gemma4-31b-16k``
+     - ``gemma4:31b``
+     - ~19 GB
      - NVIDIA CUDA ≥ 24 GB VRAM
-     - Top open reasoning; chain-of-thought; 24 GB tier
-   * - ``ministral-3-14b-16k``
-     - ``ministral-3:14b``
-     - ~9.1 GB
-     - GPU ≥ 14 GB VRAM
-     - High-quality general + vision on GPU
+     - Dense Gemma 4 with thinking + vision; alternative to Qwen3.8 (``--all``)
+   * - ``gemma4-12b-16k``
+     - ``gemma4:12b``
+     - ~7.7 GB
+     - GPU ≥ 12 GB VRAM
+     - General + vision on mid-range GPUs
    * - ``deepseek-r1-8b-16k``
      - ``deepseek-r1:8b``
      - ~5 GB
@@ -225,8 +237,8 @@ General — chat, reasoning, quick one-shot questions
      - R1-0528 Qwen3-8B distill; best CPU reasoning
    * - ``gemma4-e4b-8k``
      - ``gemma4:e4b``
-     - ~9.6 GB
-     - any CPU, 12 GB RAM
+     - ~6.6 GB
+     - any CPU, 9 GB RAM
      - Native multimodal; Gemma 4 edge model; strong reasoning
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
@@ -237,7 +249,7 @@ General — chat, reasoning, quick one-shot questions
      - ``qwen3.5:9b``
      - ~6.6 GB
      - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality, but slow in Ollama today (see note)
+     - Native multimodal, highest quality; CPU speed unverified (see note)
    * - ``qwen3-1.7b-4k``
      - ``qwen3:1.7b``
      - ~1.5 GB
@@ -278,22 +290,22 @@ Embedding — RAG / document search (Open WebUI)
 
 .. note::
 
-   **Qwen3.5 9B is slow in Ollama today:** its hybrid Gated-Delta-Network
-   (linear attention) layers are not yet well optimized by Ollama's bundled
-   llama.cpp — see `ollama/ollama#14579
-   <https://github.com/ollama/ollama/issues/14579>`_ and `#14861
-   <https://github.com/ollama/ollama/issues/14861>`_, which report 5-6x slower
-   generation than llama.cpp directly, on both CPU and GPU. ``pull-models.sh``
-   therefore ranks it last in each category (an explicit opt-in via
-   ``--all`` or ``ollama pull qwen3.5:9b`` rather than the automatic "best"
-   pick) until upstream support matures.
+   **Qwen3.5 9B speed:** its hybrid Gated-Delta-Network (linear attention)
+   layers were 5-6x slower in Ollama than in llama.cpp directly — see
+   `ollama/ollama#14579 <https://github.com/ollama/ollama/issues/14579>`_ and
+   `#14861 <https://github.com/ollama/ollama/issues/14861>`_. Ollama 0.31.2
+   fixed this on CUDA (measured within ~15% of llama.cpp); CPU-only speed has
+   not been re-measured. ``pull-models.sh`` therefore still ranks it last in
+   each CPU category (an explicit opt-in via ``--all`` or
+   ``ollama pull qwen3.5:9b`` rather than the automatic "best" pick) until
+   that is confirmed.
 
 .. note::
 
    **Gemma 4 "effective" parameters:** ``gemma4:e4b``'s "4B" refers to
    *effective* (active) parameters, not on-disk weight size — the actual
-   Q4_K_M download is 9.6 GB, larger than some models with bigger parameter
-   counts in their name. Its hardware gate (12 GB RAM) reflects the real size.
+   Q4_K_M download is 6.6 GB, larger than some models with bigger parameter
+   counts in their name. Its hardware gate (9 GB RAM) reflects the real size.
 
 .. note::
 
@@ -604,8 +616,8 @@ On an 8 GB x86_64 CPU host (2 GB reserved, 6 GB effective), selects:
 ``qwen2.5-coder-7b-16k`` (coding), ``ministral-3-3b-16k`` (vision),
 ``deepseek-r1-8b-16k`` (general), ``qwen3-1.7b-4k`` (task model, always pulled),
 ``nomic-embed-text-8k`` (embedding). ``qwen3.5:9b`` would also fit at this tier
-but is ranked last per-category due to its current Ollama slowness (see note
-above) — pull it explicitly with ``--all`` or by name if you want it anyway.
+but is ranked last per-category because its CPU speed in Ollama is unverified
+(see note above) — pull it explicitly with ``--all`` or by name if you want it anyway.
 
 Verify the proxy
 ^^^^^^^^^^^^^^^^
@@ -671,7 +683,7 @@ Configure OpenCode
            "qwen2.5-coder-7b-16k": { "name": "Qwen2.5-Coder 7B — reliable (16k)",        "tools": true },
            "deepseek-r1-8b-16k":   { "name": "DeepSeek-R1 8B — CPU reasoning (16k)",     "tools": false },
            "gemma4-e4b-8k":        { "name": "Gemma 4 4B — vision/general (8k)",          "tools": true },
-           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k), slow (see note)", "tools": true }
+           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k), see note", "tools": true }
          }
        }
      }
@@ -753,16 +765,16 @@ Pull GPU models
 
    ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
 
-Adds ``ministral-3-14b-16k`` and ``devstral-small-2-32k``.
+Adds ``gemma4-12b-16k`` and ``qwen3.8-27b-32k``.
 
 Add to ``opencode.json`` models block:
 
 .. code-block:: json
 
-   "ministral-3-14b-16k":   { "name": "Ministral-3 14B — vision (16k)",    "tools": true },
-   "devstral-small-2-32k":  { "name": "Devstral Small 2 — agentic (32k)",  "tools": true }
+   "gemma4-12b-16k":   { "name": "Gemma 4 12B — vision/general (16k)", "tools": true },
+   "qwen3.8-27b-32k":  { "name": "Qwen3.8 27B — agentic (32k)",        "tools": true }
 
-Change default: ``"model": "ollama/devstral-small-2-32k"``
+Change default: ``"model": "ollama/qwen3.8-27b-32k"``
 
 NVIDIA GPU (x86-64)
 ~~~~~~~~~~~~~~~~~~~
@@ -803,7 +815,7 @@ Pull GPU models
 
    ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
 
-Adds ``ministral-3-14b-16k`` and ``devstral-small-2-32k`` (same GPU-tier
+Adds ``gemma4-12b-16k`` and ``qwen3.8-27b-32k`` (same GPU-tier
 models as the ROCm path — see that section for the ``opencode.json`` entries).
 
 ARM64
