@@ -37,8 +37,8 @@ Yaml=%h/.config/containers/systemd/stack.yml
 
 # Auto-update images when new versions are available via the registry.
 # No effect on the ollama container: localhost/ollama-cpu:latest is built
-# locally and never pushed, so it has no registry to check — rebuild it
-# manually to pick up a new base image.
+# locally and never pushed, so it has no registry to check — re-run the
+# playbook after a Dockerfile change to rebuild it, then restart the service.
 AutoUpdate=registry
 
 [Service]

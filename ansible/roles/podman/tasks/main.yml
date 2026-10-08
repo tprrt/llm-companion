@@ -144,16 +144,31 @@
   changed_when: false
 
 # ── Build Ollama image ────────────────────────────────────────────────────────
-- name: Check if Ollama image already exists
+# The image is labelled with the checksum of the Dockerfile it was built from,
+# so that bumping the base image in the Dockerfile triggers a rebuild on the
+# next playbook run instead of keeping the old image forever.
+- name: Checksum the Dockerfile
+  ansible.builtin.stat:
+    path: "{{ llm_project_dir }}/Dockerfile"
+    checksum_algorithm: sha256
+  register: podman_dockerfile_stat
+
+- name: Inspect the existing Ollama image
   ansible.builtin.command:
-    cmd: podman image exists {{ ollama_image_tag }}
+    cmd: podman image inspect {{ ollama_image_tag }}
   register: podman_ollama_image_check
   failed_when: false
   changed_when: false
 
 - name: Build Ollama image from project directory
   ansible.builtin.command:
-    cmd: podman build --target {{ ollama_build_target }} -t {{ ollama_image_tag }} {{ llm_project_dir }}
+    cmd: >-
+      podman build --target {{ ollama_build_target }}
+      --label llm-companion.dockerfile-sha256={{ podman_dockerfile_stat.stat.checksum }}
+      -t {{ ollama_image_tag }} {{ llm_project_dir }}
   register: podman_ollama_build_result
   changed_when: podman_ollama_build_result.rc == 0
-  when: podman_ollama_image_check.rc != 0
+  when: >-
+    podman_ollama_image_check.rc != 0
+    or ((podman_ollama_image_check.stdout | from_json)[0].Labels | default({}, true)).get('llm-companion.dockerfile-sha256')
+    != podman_dockerfile_stat.stat.checksum

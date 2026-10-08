@@ -213,7 +213,7 @@ spec:
     # (which would pull in the full dependency chain and OOM) and uses only
     # stdlib sqlite3.
     - name: open-webui-db-guard # NOSONAR — S6864/S6870/S6873/S6892/S6897 inapplicable
-      image: ghcr.io/open-webui/open-webui:v0.10.2 # keep in sync with the open-webui container below
+      image: ghcr.io/open-webui/open-webui:v0.11.4 # keep in sync with the open-webui container below
       command:
         - python3
         - -c
@@ -306,7 +306,7 @@ spec:
 
     # ── Open WebUI ───────────────────────────────────────────────────────────
     - name: open-webui # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
-      image: ghcr.io/open-webui/open-webui:v0.10.2
+      image: ghcr.io/open-webui/open-webui:v0.11.4
       env:
         # Open WebUI binds on port 3000 (not 8080) to avoid conflicting with Caddy.
         - name: PORT
@@ -407,7 +407,7 @@ spec:
     # the pod. Connect via Admin → Connections → Open Terminal in Open WebUI,
     # using http://localhost:8000 and the key from open-terminal-api-key.env.
     - name: open-terminal # NOSONAR — storage limits inapplicable to podman play kube
-      image: ghcr.io/open-webui/open-terminal:0.11.34-slim
+      image: ghcr.io/open-webui/open-terminal:0.14.0-slim
       env:
         - name: OPEN_TERMINAL_API_KEY
           valueFrom:
@@ -455,7 +455,7 @@ spec:
     # Internal-only metasearch engine used by Open WebUI for web search.
     # Not exposed outside the pod — reachable only on localhost:8888.
     - name: searxng # NOSONAR — storage limits inapplicable to podman play kube
-      image: docker.io/searxng/searxng:2026.7.7-f69b22c45
+      image: docker.io/searxng/searxng:2026.10.7-6671d89be
       env:
         # Bind on port 8888 to avoid conflicting with Caddy's :8080.
         - name: SEARXNG_PORT
@@ -505,7 +505,7 @@ spec:
 
     # ── Caddy ────────────────────────────────────────────────────────────────
     - name: caddy # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
-      image: docker.io/library/caddy:2.11.4
+      image: docker.io/library/caddy:2.11.7
       env:
         # API key for Ollama Bearer token auth — read from the Kubernetes Secret.
         - name: OLLAMA_API_KEY
