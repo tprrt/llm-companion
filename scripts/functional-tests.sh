@@ -45,7 +45,8 @@ fi
 rc=0
 
 ok() {
-    printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "$1"
+    local name="$1"
+    printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name}"
 }
 
 fail() {
