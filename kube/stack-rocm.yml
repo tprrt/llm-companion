@@ -6,7 +6,7 @@
 #
 # This file is identical to stack.yml except for the Ollama container:
 #   - Uses the ollama-rocm image (built with ROCm support)
-#   - OLLAMA_CONTEXT_LENGTH increased to 32768 (enough for Devstral-Small-2)
+#   - OLLAMA_CONTEXT_LENGTH increased to 32768 (for the 32k GPU models)
 #   - ROCR_VISIBLE_DEVICES=all to expose all ROCm-capable GPUs
 #   - securityContext.privileged=true (required for /dev/kfd and /dev/dri
 #     access in rootless Podman; see note below)
@@ -253,7 +253,7 @@ spec:
         # Listen on all interfaces within the pod network namespace.
         - name: OLLAMA_HOST
           value: "0.0.0.0:11434"
-        # Larger context window for Devstral-Small-2 (24B model).
+        # Larger context window for the 32k GPU models (e.g. Qwen3.8 27B).
         - name: OLLAMA_CONTEXT_LENGTH
           value: "32768"
         - name: OLLAMA_KEEP_ALIVE

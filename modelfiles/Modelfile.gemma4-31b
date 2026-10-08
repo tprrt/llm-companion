@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.gemma4-31b — Gemma 4 31B with 16k context
+#
+# Dense general + vision model with thinking, from a different family than
+# Qwen3.8 27B. Pick it when you want a second opinion or Gemma's multilingual
+# strengths; Qwen3.8 27B is the default at this tier.
+#
+# TARGET: GPU host with ≥ 24 GB VRAM (e.g. RTX 3090 / 4090, A5000).
+# This model WILL NOT fit on a GPU with less than 24 GB VRAM.
+#
+# Memory guide (Q4_K_M, ≈ 19 GB base):
+#   8k ctx  → ~21 GB total  → needs 24 GB VRAM
+#   16k ctx → ~22 GB total  → needs 24 GB VRAM (tight on 24 GB cards)
+#
+# Create with:
+#   podman cp Modelfile.gemma4-31b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create gemma4-31b-16k \
+#       -f /tmp/Modelfile.gemma4-31b
+# =============================================================================
+
+FROM gemma4:31b
+
+# Drop to 8192 if you hit OOM.
+PARAMETER num_ctx 16384
+
+PARAMETER temperature 0.15

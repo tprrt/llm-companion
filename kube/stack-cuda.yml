@@ -245,7 +245,7 @@ spec:
         # Listen on all interfaces within the pod network namespace.
         - name: OLLAMA_HOST
           value: "0.0.0.0:11434"
-        # Larger context window for Devstral-Small-2 (24B model).
+        # Larger context window for the 32k GPU models (e.g. Qwen3.8 27B).
         - name: OLLAMA_CONTEXT_LENGTH
           value: "32768"
         - name: OLLAMA_KEEP_ALIVE
