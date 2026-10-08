@@ -240,6 +240,7 @@ jobs:
       - checkout
       - run:
           name: Check SPDX-License-Identifier headers
+          # REUSE-IgnoreStart
           command: |
             rc=0
             for f in \
@@ -253,6 +254,7 @@ jobs:
               fi
             done
             exit $rc
+          # REUSE-IgnoreEnd
 
 workflows:
 
