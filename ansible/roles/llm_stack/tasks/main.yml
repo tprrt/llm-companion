@@ -23,6 +23,13 @@
     mode: "0755" # NOSONAR — executable script in ~/.local/bin; world-read+execute is intentional
 
 # ── Render stack manifest ─────────────────────────────────────────────────────
+- name: Check llm_tls_hostnames entries are host names or IP addresses
+  ansible.builtin.assert:
+    that: item is match('^[A-Za-z0-9.:-]+$')
+    fail_msg: "llm_tls_hostnames: '{{ item }}' is not a host name or IP address"
+    quiet: true
+  loop: "{{ llm_tls_hostnames }}"
+
 # kube/stack.yml.j2 is rendered on the control node for the host's
 # ollama_build_target (image, context length, GPU access) and embeds
 # caddy/Caddyfile. The destination is always stack.yml so the Quadlet unit

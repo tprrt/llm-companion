@@ -497,6 +497,17 @@ spec:
             secretKeyRef:
               name: llm-companion-secrets
               key: ollama-api-key
+{% if llm_tls_hostnames %}
+        # TLS on (llm_tls_hostnames): certificates from Caddy's local CA for
+        # these names plus localhost, no HTTP-to-HTTPS redirect. See the
+        # placeholders in caddy/Caddyfile.
+        - name: LLM_AUTO_HTTPS
+          value: "disable_redirects"
+        - name: LLM_TLS
+          value: "tls internal"
+        - name: LLM_SITE_ADDRESS
+          value: "{{ (['localhost'] + llm_tls_hostnames) | unique | map('regex_replace', '^(.*:.*)$', '[\\1]') | map('regex_replace', '$', ':8080') | join(', ') }}"
+{% endif %}
       ports:
         # Publish Caddy's port to the host.
         - containerPort: 8080

@@ -9,6 +9,12 @@ llm_web_port: 8080
 # ["192.168.1.0/24", "100.64.0.0/10"]. Empty opens the port to every source.
 llm_allowed_networks: []
 
+# Host names and IP addresses clients use to reach the stack. When set,
+# Caddy serves HTTPS on llm_web_port with certificates for these names (and
+# localhost) from its own local CA; clients must trust that CA (see README).
+# Empty keeps plain HTTP.
+llm_tls_hostnames: []
+
 # Directory containing the llm-companion project files on the TARGET host.
 # The Ollama image is built from the Dockerfile here, and the helper scripts
 # are installed from here.

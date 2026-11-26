@@ -36,7 +36,14 @@ set -uo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
+# Caddy serves HTTPS on :8080 when llm_tls_hostnames is set. -k because the
+# certificate comes from Caddy's own local CA and this only talks to localhost.
 BASE_URL="http://localhost:8080"
+TLS_OPTS=()
+if curl -sk -o /dev/null --connect-timeout 3 https://localhost:8080/ 2>/dev/null; then
+    BASE_URL="https://localhost:8080"
+    TLS_OPTS=(-k)
+fi
 
 if [[ -z "${OLLAMA_API_KEY}" ]]; then
     printf 'WARNING: no OLLAMA_API_KEY found at %s/.config/ollama/api-key.env — the authenticated Ollama and SearXNG checks below will fail with HTTP 401.\n' "${HOME}" >&2
@@ -64,7 +71,7 @@ fail() {
 get_bearer() {
     local url="$1" maxtime="$2"
     printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
-        | curl -s --connect-timeout 5 --max-time "${maxtime}" -K - \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time "${maxtime}" -K - \
             -w '\n%{http_code}' "${url}" 2>/dev/null
 }
 
@@ -77,7 +84,7 @@ post_json() {
     tmp=$(mktemp)
     printf '%s' "${json}" > "${tmp}"
     printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
-        | curl -s --connect-timeout 5 --max-time "${maxtime}" -K - \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time "${maxtime}" -K - \
             -H "Content-Type: application/json" --data-binary "@${tmp}" \
             -w '\n%{http_code}' "${url}" 2>/dev/null
     local curl_rc=$?
@@ -209,7 +216,7 @@ step_open_webui() {
     printf '%b── Open WebUI ──────────────────────────────────────%b\n' "${CYAN}" "${NC}"
 
     local raw code body
-    raw=$(curl -s --connect-timeout 5 --max-time 10 -w '\n%{http_code}' "${BASE_URL}/" 2>/dev/null)
+    raw=$(curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -w '\n%{http_code}' "${BASE_URL}/" 2>/dev/null)
     code="${raw##*$'\n'}"
     body="${raw%$'\n'*}"
 
@@ -248,7 +255,7 @@ step_auth() {
     printf '%b── Auth enforcement ────────────────────────────────%b\n' "${CYAN}" "${NC}"
 
     local code
-    code=$(curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' \
+    code=$(curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' \
         "${BASE_URL}/ollama/api/tags" 2>/dev/null)
     if [[ "${code}" == "401" ]]; then
         ok "Auth — no Authorization header rejected (HTTP ${code})"
@@ -257,7 +264,7 @@ step_auth() {
     fi
 
     code=$(printf 'header = "Authorization: Bearer wrong-token"\n' \
-        | curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
             "${BASE_URL}/ollama/api/tags" 2>/dev/null)
     if [[ "${code}" == "401" ]]; then
         ok "Auth — wrong Bearer token rejected (HTTP ${code})"
@@ -270,7 +277,7 @@ step_auth() {
     # Bearer token would match it and slip through. Check that directly
     # rather than relying on the wrong-token case above to catch it.
     code=$(printf 'header = "Authorization: Bearer "\n' \
-        | curl -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
             "${BASE_URL}/ollama/api/tags" 2>/dev/null)
     if [[ "${code}" == "401" ]]; then
         ok "Auth — empty Bearer token rejected (HTTP ${code})"

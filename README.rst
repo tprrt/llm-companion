@@ -58,10 +58,10 @@ Stack architecture
 
 .. warning::
 
-   TLS is **disabled by default** (plain HTTP). Do **not** expose port 8080
-   to the public internet without enabling TLS in the Caddyfile — the Open
-   WebUI login page and Bearer token would be transmitted in clear text.
-   This default configuration is safe only on a LAN or VPN.
+   TLS is **disabled by default** (plain HTTP): the Open WebUI login and the
+   Bearer token cross the network in clear text. Set ``llm_tls_hostnames``
+   (see `Enable HTTPS`_) on any network you do not fully trust, and never
+   expose port 8080 to the public internet.
 
 ----
 
@@ -597,6 +597,37 @@ To accept connections only from your LAN or VPN, list the networks in
 Networks removed from the list later have their rules removed on the next
 playbook run; an empty list opens the port to every source again.
 
+Enable HTTPS
+^^^^^^^^^^^^
+
+List the names and addresses clients use to reach the host:
+
+.. code-block:: yaml
+
+   llm_tls_hostnames: ["llm.lan", "192.168.1.100"]
+
+Caddy then serves HTTPS on port 8080 with certificates from its own local CA,
+kept in the ``llm-caddy-data`` volume; plain HTTP requests on that port get
+an HTTP 400 reply.
+Clients connecting through any other name get a TLS error. Export the CA
+certificate once the service is up, and make each client trust it:
+
+.. code-block:: bash
+
+   podman cp llm-companion-caddy:/data/caddy/pki/authorities/local/root.crt llm-companion-ca.crt
+
+   # Fedora client
+   sudo cp llm-companion-ca.crt /etc/pki/ca-trust/source/anchors/ && sudo update-ca-trust
+   # Debian client
+   sudo cp llm-companion-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates
+   # OpenCode (Node.js does not read the system store)
+   export NODE_EXTRA_CA_CERTS=/path/to/llm-companion-ca.crt
+
+Browsers may need the certificate imported into their own store. Then use
+``https://`` URLs, e.g. ``"baseURL": "https://llm.lan:8080/ollama/v1"`` in
+``opencode.json``. ``check-services.sh`` and ``functional-tests.sh`` detect
+HTTPS on their own.
+
 Or use the hardware-aware setup script
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -704,7 +735,8 @@ Configure OpenCode
      }
    }
 
-Replace ``<server-ip>`` with your LAN IP or Tailscale/WireGuard address.
+Replace ``<server-ip>`` with your LAN IP or Tailscale/WireGuard address, and
+``http`` with ``https`` if you enabled HTTPS.
 
 To add cloud fallbacks, extend the ``provider`` block:
 

@@ -115,6 +115,14 @@ jobs:
       - run:
           name: Validate Caddyfile syntax
           command: OLLAMA_API_KEY=ci-placeholder caddy validate --config caddy/Caddyfile
+      - run:
+          name: Validate Caddyfile syntax with TLS on
+          # The environment kube/stack.yml.j2 gives Caddy when llm_tls_hostnames
+          # is set.
+          command: |
+            OLLAMA_API_KEY=ci-placeholder LLM_AUTO_HTTPS=disable_redirects \
+              LLM_TLS="tls internal" LLM_SITE_ADDRESS="localhost:8080, llm.lan:8080" \
+              caddy validate --config caddy/Caddyfile
 
   # ---------------------------------------------------------------------------
   # ansible-lint — lint all Ansible playbooks and roles

@@ -13,7 +13,7 @@
 #   fields in kube/stack.yml.j2. No curl or exec into the container needed.
 #   Ollama, Open WebUI, Open Terminal, SearXNG, Caddy → healthy / unhealthy
 #
-# Via Caddy (from VM host — only hostPort :8080 is published):
+# Via Caddy (from VM host — only hostPort :8080 is published; HTTPS when TLS is on):
 #   Open WebUI    localhost:8080   GET /health         → HTTP 200
 #   Ollama        localhost:8080   GET /ollama/api/tags → HTTP 200 (Bearer token)
 #   SearXNG       localhost:8080   GET /searxng/        → HTTP 200 (Bearer token)
@@ -27,6 +27,15 @@ set -uo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
+
+# Caddy serves HTTPS on :8080 when llm_tls_hostnames is set. -k because the
+# certificate comes from Caddy's own local CA and this only talks to localhost.
+BASE_URL="http://localhost:8080"
+TLS_OPTS=()
+if curl -sk -o /dev/null --connect-timeout 3 https://localhost:8080/ 2>/dev/null; then
+    BASE_URL="https://localhost:8080"
+    TLS_OPTS=(-k)
+fi
 
 # Reads Podman's native health state for a container (derived from livenessProbe).
 # Status values: healthy | unhealthy | starting | none | unknown
@@ -57,9 +66,9 @@ http_check() {
     # than -H on the command line, so it never appears in `ps`/`/proc/*/cmdline`.
     if [[ -n "${bearer}" ]]; then
         code=$(printf 'header = "Authorization: Bearer %s"\n' "${bearer}" \
-            | curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" -K - "$url" 2>/dev/null || true)
+            | curl "${TLS_OPTS[@]}" --connect-timeout 5 -s -o /dev/null -w "%{http_code}" -K - "$url" 2>/dev/null || true)
     else
-        code=$(curl --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
+        code=$(curl "${TLS_OPTS[@]}" --connect-timeout 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)
     fi
     if [[ "$code" == "200" ]]; then
         printf '%b[OK]%b    %s\n' "${GREEN}" "${NC}" "${name} — HTTP ${code}"
@@ -80,8 +89,8 @@ pod_health_check "llm-companion-searxng"       "SearXNG"        || rc=1
 pod_health_check "llm-companion-caddy"         "Caddy"          || rc=1
 
 printf '%b── Via Caddy (:8080) ───────────────────────────────%b\n' "${CYAN}" "${NC}"
-http_check "Open WebUI (:8080/health)"    "http://localhost:8080/health"                              || rc=1
-http_check "Ollama     (:8080/ollama/)"   "http://localhost:8080/ollama/api/tags"    "${OLLAMA_API_KEY}" || rc=1
-http_check "SearXNG    (:8080/searxng/)"  "http://localhost:8080/searxng/"           "${OLLAMA_API_KEY}" || rc=1
+http_check "Open WebUI (:8080/health)"    "${BASE_URL}/health"                              || rc=1
+http_check "Ollama     (:8080/ollama/)"   "${BASE_URL}/ollama/api/tags"    "${OLLAMA_API_KEY}" || rc=1
+http_check "SearXNG    (:8080/searxng/)"  "${BASE_URL}/searxng/"           "${OLLAMA_API_KEY}" || rc=1
 
 exit "$rc"

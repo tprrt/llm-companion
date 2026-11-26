@@ -4,19 +4,22 @@
 	# Disable the admin API — not needed for this setup.
 	admin off
 
-	# Disable HTTPS redirection — we're on an internal network.
-	# Remove this block if you enable TLS below.
-	auto_https off
+	# Plain HTTP by default. With TLS on (llm_tls_hostnames in Ansible), the
+	# pod sets LLM_AUTO_HTTPS=disable_redirects: certificates, but no
+	# HTTP-to-HTTPS redirect, since both would need port 8080.
+	auto_https {$LLM_AUTO_HTTPS:off}
 }
 
-:8080 {
-	# ── TLS (disabled by default) ──────────────────────────────────────
-	# WARNING: plain HTTP only — do NOT expose port 8080 to the public
-	# internet without enabling TLS. Safe for LAN / VPN use only.
-	# Uncomment to enable a self-signed cert (trustable on LAN/VPN):
-	# tls internal
-	# Uncomment for ACME/Let's Encrypt with a public domain:
-	# tls your@email.com
+# Site address: ":8080" (plain HTTP, any host name) by default. With TLS on,
+# LLM_SITE_ADDRESS lists the host names and IPs to issue certificates for,
+# each with :8080.
+{$LLM_SITE_ADDRESS::8080} {
+	# ── TLS (off by default) ───────────────────────────────────────────
+	# WARNING: without TLS, the Open WebUI login and the Bearer token cross
+	# the network in clear text. Keep port 8080 on a LAN or VPN, or set
+	# llm_tls_hostnames so the pod sets LLM_TLS to "tls internal":
+	# certificates from Caddy's own local CA, which clients must trust.
+	{$LLM_TLS}
 
 	# ── Ollama API — Bearer token protected ────────────────────────────
 	# Prefixed with /ollama/ to avoid conflicting with Open WebUI's own /api/.

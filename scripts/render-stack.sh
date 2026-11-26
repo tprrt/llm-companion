@@ -14,6 +14,8 @@
 #
 # ROCm GFX override: set HSA_OVERRIDE_GFX_VERSION in the environment (e.g.
 # 11.0.0), matching the ollama_hsa_override_gfx_version Ansible variable.
+# TLS: set LLM_TLS_HOSTNAMES to a comma-separated list of host names and IPs
+# (e.g. llm.lan,192.168.1.10), matching the llm_tls_hostnames variable.
 #
 # Requires: ansible-core (the `ansible` command).
 # =============================================================================
@@ -39,8 +41,9 @@ trap 'rm -f "${OUT}"' EXIT
 EXTRA_VARS=$(python3 -c 'import json, sys; print(json.dumps({
     "ollama_build_target": sys.argv[1],
     "llm_repo_dir": sys.argv[2],
-    "ollama_hsa_override_gfx_version": sys.argv[3]}))' \
-    "${TARGET}" "${REPO_DIR}" "${HSA_OVERRIDE_GFX_VERSION:-}")
+    "ollama_hsa_override_gfx_version": sys.argv[3],
+    "llm_tls_hostnames": [h.strip() for h in sys.argv[4].split(",") if h.strip()]}))' \
+    "${TARGET}" "${REPO_DIR}" "${HSA_OVERRIDE_GFX_VERSION:-}" "${LLM_TLS_HOSTNAMES:-}")
 
 ANSIBLE_LOCALHOST_WARNING=false ANSIBLE_INVENTORY_UNPARSED_WARNING=false \
     ansible localhost -c local -m ansible.builtin.template \
