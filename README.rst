@@ -659,6 +659,9 @@ Pull models
 ``pull-models.sh`` auto-detects your architecture (x86_64 / aarch64), GPU (AMD ROCm
 / NVIDIA CUDA), and available RAM, then selects the **best fitting model per category**.
 Hardware gate is based on total RAM minus a configurable reserve (default: 2 GB).
+To override detection, e.g. to pick CPU models on a GPU host or preview
+another machine, set ``LLM_ACCEL`` (cpu, rocm, cuda), ``LLM_VRAM_GB`` and
+``LLM_RAM_GB``: ``LLM_ACCEL=cuda LLM_VRAM_GB=24 ./scripts/pull-models.sh --list``.
 
 On an 8 GB CPU host (2 GB reserved, 6 GB effective), selects:
 ``qwen3.5-4b-16k`` (coding), ``ministral-3-3b-16k`` (vision and general),

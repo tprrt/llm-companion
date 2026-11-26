@@ -14,6 +14,7 @@
 #   caddy-validate       — check Caddyfile formatting and syntax
 #   ansible-lint         — lint Ansible playbooks
 #   kube-validate        — render kube/stack.yml.j2 per build target, validate with kubeconform
+#   test-pull-models     — check pull-models.sh picks the expected models per hardware
 #   check-spdx           — verify every source file carries an SPDX header
 # =============================================================================
 
@@ -173,6 +174,20 @@ jobs:
             kubeconform -strict -summary /tmp/stack-cpu.yml /tmp/stack-rocm.yml /tmp/stack-cuda.yml
 
   # ---------------------------------------------------------------------------
+  # test-pull-models — model selection of pull-models.sh per hardware profile
+  # ---------------------------------------------------------------------------
+  test-pull-models:
+    executor: docker-alpine
+    steps:
+      - checkout
+      - run:
+          name: Install bash
+          command: apk add --no-cache bash
+      - run:
+          name: Check model selection
+          command: ./tests/pull-models.sh
+
+  # ---------------------------------------------------------------------------
   # check-spdx — ensure every source file has an SPDX-License-Identifier line
   #
   # Covers: shell scripts, Dockerfile, Caddyfile, Quadlet units, Modelfiles,
@@ -189,7 +204,7 @@ jobs:
           command: |
             rc=0
             for f in \
-              scripts/*.sh Dockerfile caddy/Caddyfile *.container *.network modelfiles/Modelfile.* \
+              scripts/*.sh tests/*.sh Dockerfile caddy/Caddyfile *.container *.network modelfiles/Modelfile.* \
               kube/*.j2 kube/*.kube *.properties \
               $(find ansible -name '*.yml'); do
               [ -f "$f" ] || continue
@@ -221,6 +236,8 @@ workflows:
       - ansible-lint:
           <<: *ignore-gh-pages
       - kube-validate:
+          <<: *ignore-gh-pages
+      - test-pull-models:
           <<: *ignore-gh-pages
       - check-spdx:
           <<: *ignore-gh-pages

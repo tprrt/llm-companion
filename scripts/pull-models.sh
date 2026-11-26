@@ -15,6 +15,10 @@
 #   ./pull-models.sh --reserve N  # reserve N GB RAM (OS + stack + context, default: 2)
 #   ./pull-models.sh --yes        # skip the confirmation prompt (non-interactive)
 #
+# Hardware detection can be overridden, e.g. to select CPU models on a GPU host
+# or to preview another machine's picks with --list:
+#   LLM_ACCEL=cpu|rocm|cuda  LLM_VRAM_GB=N  LLM_RAM_GB=N (total RAM)
+#
 # Categories:
 #   coding  — agentic tool use, multi-file edits, OpenCode sessions
 #   vision  — image / schematic input, multilingual tasks
@@ -84,6 +88,26 @@ elif [[ ${CUDA_VRAM_GB} -ge ${GPU_MIN_VRAM_GB} ]]; then
 fi
 
 TOTAL_RAM_GB=$(awk '/MemTotal/ {printf "%.0f", $2/1024/1024}' /proc/meminfo)
+
+# Detection overrides (see Usage).
+if [[ -n "${LLM_ACCEL:-}" ]]; then
+    case "${LLM_ACCEL}" in
+        cpu)  ACCEL="cpu";  ACCEL_LABEL="CPU only (LLM_ACCEL)" ;;
+        rocm) ACCEL="rocm"; ACCEL_LABEL="AMD ROCm (LLM_ACCEL)" ;;
+        cuda) ACCEL="cuda"; ACCEL_LABEL="NVIDIA CUDA (LLM_ACCEL)" ;;
+        *) die "LLM_ACCEL must be cpu, rocm or cuda, got: ${LLM_ACCEL}" ;;
+    esac
+    [[ "${ACCEL}" == "cpu" ]] && VRAM_GB=0
+fi
+if [[ -n "${LLM_VRAM_GB:-}" ]]; then
+    [[ "${LLM_VRAM_GB}" =~ ^[0-9]+$ ]] || die "LLM_VRAM_GB must be a whole number, got: ${LLM_VRAM_GB}"
+    VRAM_GB="${LLM_VRAM_GB}"
+    ACCEL_LABEL="${ACCEL_LABEL} — ${VRAM_GB} GB VRAM"
+fi
+if [[ -n "${LLM_RAM_GB:-}" ]]; then
+    [[ "${LLM_RAM_GB}" =~ ^[0-9]+$ ]] || die "LLM_RAM_GB must be a whole number, got: ${LLM_RAM_GB}"
+    TOTAL_RAM_GB="${LLM_RAM_GB}"
+fi
 EFFECTIVE_RAM_GB=$(( TOTAL_RAM_GB - RESERVE_GB ))
 [[ ${EFFECTIVE_RAM_GB} -lt 0 ]] && EFFECTIVE_RAM_GB=0
 
