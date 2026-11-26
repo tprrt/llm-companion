@@ -276,6 +276,12 @@ spec:
       resources:
         limits:
           "nvidia.com/gpu=all": 1 # NOSONAR — S6428: CDI GPU device request; requires the NVIDIA Container Toolkit + generated CDI spec (see ansible/roles/podman)
+      securityContext:
+        # Drop all capabilities for least-privilege operation. CDI injects the
+        # GPU device nodes and libraries; Ollama needs no capability to use them.
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - name: ollama-models
           mountPath: /var/lib/ollama/models
