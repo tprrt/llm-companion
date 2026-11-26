@@ -211,6 +211,11 @@ spec:
         # Ollama still unloads models when memory runs short.
         - name: OLLAMA_MAX_LOADED_MODELS
           value: "3"
+{% if ollama_kv_cache_type %}
+        # Quantized KV cache (ollama_kv_cache_type); see group_vars/all.yml.
+        - name: OLLAMA_KV_CACHE_TYPE
+          value: "{{ ollama_kv_cache_type }}"
+{% endif %}
         # Pod mode: containers communicate via localhost, not DNS names.
         - name: OLLAMA_ORIGINS
           value: "http://localhost:8080"

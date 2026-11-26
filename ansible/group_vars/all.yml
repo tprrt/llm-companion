@@ -46,6 +46,14 @@ ollama_build_target: cpu
 # (e.g. "11.0.0" for RDNA3). Find your GPU with: rocminfo | grep gfx
 ollama_hsa_override_gfx_version: ""
 
+# KV cache type: "" (Ollama's default, f16), "q8_0" or "q4_0". A quantized
+# cache shrinks the memory each context needs, at some speed cost. On a CPU
+# (Zen 5 laptop, Ollama 0.40.18) q8_0 saved 1 GB for ministral-3:3b at 16k
+# but halved its prompt speed, and saved almost nothing for gemma4:e4b and
+# qwen3.5:0.8b while costing ~10% of prompt speed, so it stays off by
+# default. Flash attention, which it requires, is already Ollama's default.
+ollama_kv_cache_type: ""
+
 # Whether Open WebUI chats let models think before answering by default.
 # Off on CPU hosts, where thinking can take longer than the answer; on with a
 # GPU. Per-model settings and the per-chat toggle override it either way.
