@@ -94,10 +94,12 @@ Directory layout
    │   └── Caddyfile                 # Canonical reference — embedded in kube/stack.yml ConfigMap
    │
    ├── modelfiles/                   # Manual alternatives to scripts/pull-models.sh
+   │   ├── Modelfile.flint-40b
    │   ├── Modelfile.qwen3.8-27b
    │   ├── Modelfile.laguna-xs-2.1
+   │   ├── Modelfile.gemma4-26b
    │   ├── Modelfile.gemma4-12b
-   │   └── Modelfile.gemma4-31b
+   │   └── Modelfile.mimo-v2.6-9b
    │
    └── scripts/
        ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
@@ -113,14 +115,17 @@ Directory layout
 Model catalogue
 ---------------
 
-Sizes are actual Q4_K_M on-disk weight sizes. CPU gates are the resident
+Sizes are actual on-disk weight sizes (Q4_K_M unless the tag says
+otherwise). CPU gates are the resident
 memory measured with Ollama 0.40.18 at each variant's context length (weights
 plus KV cache), rounded up; speeds are prompt / generation tokens per second
 on a Zen 5 laptop CPU (Ryzen AI 7 350, 8 cores) for a ~1.8K-token code prompt.
 
 Licenses differ per model: check each model's page on ollama.com before
-commercial use. MiMo-V2.6 is MIT, Laguna XS 2.1 is OpenMDW-1.1 and LFM3 uses
-the LFM Open License v1.0.
+commercial use. MiMo-V2.6 is MIT, Flint is Apache 2.0, Laguna XS 2.1 is
+OpenMDW-1.1 and LFM3 uses the LFM Open License v1.0. GPU models are not
+benchmarked here; their gates are estimates from weight sizes, and their
+quality figures come from the publishers.
 
 ``pull-models.sh`` auto-detects your architecture, GPU, and available RAM, then
 selects the **best fitting model per category** (coding, vision, general, embedding).
@@ -137,6 +142,11 @@ Coding — agentic tool use, multi-file edits
      - Disk
      - Gate
      - Strength
+   * - ``flint-40b-32k``
+     - ``flint:40b``
+     - ~23 GB
+     - GPU ≥ 32 GB VRAM
+     - MoE 40B/2.5B-active; agentic coding; SWE-bench Verified 74.2 (publisher)
    * - ``qwen3.8-27b-32k``
      - ``qwen3.8:27b``
      - ~18 GB
@@ -147,11 +157,11 @@ Coding — agentic tool use, multi-file edits
      - ~20 GB
      - NVIDIA CUDA ≥ 24 GB VRAM
      - MoE 33B/3B-active; agentic coding; faster than the dense 27B
-   * - ``qwen2.5-coder-14b-32k``
-     - ``qwen2.5-coder:14b``
-     - ~9 GB
-     - GPU ≥ 14 GB VRAM
-     - Reliable tool-call format; mid-GPU tier
+   * - ``mimo-v2.6-9b-q8_0-32k``
+     - ``mimo-v2.6:9b-q8_0``
+     - ~10 GB
+     - GPU ≥ 12 GB VRAM
+     - MiMo-V2.6 9B at Q8; tools + vision; mid-GPU tier
    * - ``mimo-v2.6-9b-16k``
      - ``mimo-v2.6:9b``
      - ~6.6 GB
@@ -184,6 +194,11 @@ Vision — image / schematic input, multilingual
      - ~18 GB
      - GPU ≥ 24 GB VRAM
      - Vision alongside coding and general use; one pull covers all three
+   * - ``gemma4-26b-16k``
+     - ``gemma4:26b``
+     - ~18 GB
+     - GPU ≥ 20 GB VRAM
+     - MoE 25B/3.8B-active; alternative to Qwen3.8 27B, fewer active parameters
    * - ``gemma4-12b-16k``
      - ``gemma4:12b``
      - ~7.7 GB
@@ -221,11 +236,11 @@ General — chat, reasoning, quick one-shot questions
      - ~18 GB
      - GPU ≥ 24 GB VRAM
      - Thinking model; best general pick at the 24 GB tier
-   * - ``gemma4-31b-16k``
-     - ``gemma4:31b``
-     - ~19 GB
-     - NVIDIA CUDA ≥ 24 GB VRAM
-     - Dense Gemma 4 with thinking + vision; alternative to Qwen3.8 (``--all``)
+   * - ``gemma4-26b-16k``
+     - ``gemma4:26b``
+     - ~18 GB
+     - GPU ≥ 20 GB VRAM
+     - MoE 25B/3.8B-active; alternative to Qwen3.8 27B, fewer active parameters (``--all``)
    * - ``gemma4-12b-16k``
      - ``gemma4:12b``
      - ~7.7 GB
@@ -751,18 +766,26 @@ Pull GPU models
 
 .. code-block:: bash
 
-   ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
+   ./scripts/pull-models.sh         # best fitting model per category
+   ./scripts/pull-models.sh --all   # every model that fits the VRAM
 
-Adds ``gemma4-12b-16k`` and ``qwen3.8-27b-32k``.
+Models available by VRAM: from 12 GB ``mimo-v2.6-9b-q8_0-32k`` (coding) and
+``gemma4-12b-16k`` (vision/general); from 20 GB ``gemma4-26b-16k``; from
+24 GB ``qwen3.8-27b-32k``; from 32 GB ``flint-40b-32k`` (coding). The default
+run pulls the best of these per category; ``--all`` pulls every one that fits.
 
-Add to ``opencode.json`` models block:
+Add the ones you pulled to the ``opencode.json`` models block:
 
 .. code-block:: json
 
-   "gemma4-12b-16k":   { "name": "Gemma 4 12B — vision/general (16k)", "tools": true },
-   "qwen3.8-27b-32k":  { "name": "Qwen3.8 27B — agentic (32k)",        "tools": true }
+   "mimo-v2.6-9b-q8_0-32k": { "name": "MiMo-V2.6 9B Q8 — coding (32k)",       "tools": true },
+   "gemma4-12b-16k":        { "name": "Gemma 4 12B — vision/general (16k)",   "tools": true },
+   "gemma4-26b-16k":        { "name": "Gemma 4 26B — vision/general (16k)",   "tools": true },
+   "qwen3.8-27b-32k":       { "name": "Qwen3.8 27B — agentic (32k)",          "tools": true },
+   "flint-40b-32k":         { "name": "Flint 40B — agentic coding (32k)",     "tools": true }
 
-Change default: ``"model": "ollama/qwen3.8-27b-32k"``
+Change default to the best coding model pulled, e.g.
+``"model": "ollama/qwen3.8-27b-32k"``.
 
 NVIDIA GPU (x86-64)
 ~~~~~~~~~~~~~~~~~~~
@@ -801,10 +824,11 @@ Pull GPU models
 
 .. code-block:: bash
 
-   ./scripts/pull-models.sh --all   # bypass RAM check — pull everything
+   ./scripts/pull-models.sh         # best fitting model per category
+   ./scripts/pull-models.sh --all   # every model that fits the VRAM
 
-Adds ``gemma4-12b-16k`` and ``qwen3.8-27b-32k`` (same GPU-tier
-models as the ROCm path — see that section for the ``opencode.json`` entries).
+Same GPU tiers as the ROCm path (see that section for the ``opencode.json``
+entries), plus ``laguna-xs-2.1-32k`` (coding, CUDA only) from 24 GB.
 
 ARM64
 ~~~~~

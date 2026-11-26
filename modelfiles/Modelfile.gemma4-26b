@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.gemma4-26b — Gemma 4 26B (MoE) with 16k context
+#
+# Mixture of experts: 25.2B total, 3.8B active parameters per token.
+# Vision, tools and thinking. Default vision + general pick for 20-23 GB
+# cards, and the alternative to the dense Qwen3.8 27B at 24 GB (--all).
+#
+# Memory guide (Q4_K_M, ≈ 16-18 GB base; estimate, not measured on a GPU):
+#   16k ctx → expected to fit 20 GB VRAM
+#
+# Create with:
+#   podman cp Modelfile.gemma4-26b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create gemma4-26b-16k \
+#       -f /tmp/Modelfile.gemma4-26b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM gemma4:26b
+
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.15

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.mimo-v2.6-9b — MiMo-V2.6 9B at Q8_0 with 32k context
+#
+# Xiaomi's code and agent fine-tune of Qwen3.5-9B, with tools, vision and
+# thinking. GPU coding pick for 12-23 GB cards; the CPU tier uses the Q4_K_M
+# default tag (mimo-v2.6:9b) at 16k instead.
+#
+# Thinking is on by default and cannot be disabled here: send "think": false
+# (Ollama API) or "reasoning_effort": "none" (/v1) per request.
+#
+# Memory guide (Q8_0, ≈ 10 GB base; estimate, not measured on a GPU — at
+# Q4_K_M and 16k it used ~1 GB above its weights on CPU):
+#   32k ctx → expected to fit 12 GB VRAM
+#
+# Create with:
+#   podman cp Modelfile.mimo-v2.6-9b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create mimo-v2.6-9b-q8_0-32k \
+#       -f /tmp/Modelfile.mimo-v2.6-9b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM mimo-v2.6:9b-q8_0
+
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.15

@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+
+# =============================================================================
+# Modelfile.flint-40b — Flint 40B (MoE) with 32k context
+#
+# Recursive's agentic coding model: 39.8B total, ~2.5B active parameters per
+# token. Publisher-reported SWE-bench Verified 74.2, Terminal-Bench 2.1 54.9.
+# Apache 2.0.
+#
+# TARGET: GPU host with ≥ 32 GB VRAM. The 23 GB of weights leave no room for
+# a 32k KV cache on a 24 GB card.
+#
+# Create with:
+#   podman cp Modelfile.flint-40b llm-companion-ollama:/tmp/
+#   podman exec -it llm-companion-ollama ollama create flint-40b-32k \
+#       -f /tmp/Modelfile.flint-40b
+#
+# pull-models.sh does this automatically.
+# =============================================================================
+
+FROM flint:40b
+
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.15

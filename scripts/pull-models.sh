@@ -114,6 +114,13 @@ fi
 
 declare -a MODELS=(
     # ── GPU models ──────────────────────────────────────────────────────────
+    # Coding model for hosts with 32 GB+ of VRAM: MoE with 39.8B total and
+    # ~2.5B active parameters per token, against 27B for the dense model
+    # below. Publisher-reported SWE-bench Verified 74.2. The 23 GB of
+    # weights leave no room for a 32k KV cache on a 24 GB card, hence the
+    # 32 GB gate. Apache 2.0. Not benchmarked here (no GPU).
+    "Flint 40B|flint:40b|0|32|32768||any|any_gpu|coding|MoE 40B/2.5B-active; agentic coding; Apache 2.0; ~23 GB weights"
+
     # Best all-round model for GPU hosts: dense 27B with vision, tool use and
     # thinking; covers coding, vision and general from a single pull. Actual
     # Q4_K_M weight is 18 GB; ctx=32768 needs ~5 GB of KV cache headroom on top
@@ -121,26 +128,29 @@ declare -a MODELS=(
     # gate at 24 GB.
     "Qwen3.8 27B|qwen3.8:27b|0|24|32768||any|any_gpu|coding,vision,general|Newest Qwen; agentic coding + vision + thinking in one model; ~18 GB weights"
 
-    # Mid-GPU vision + general model (12-23 GB VRAM). Actual Q4_K_M weight is
+    # Vision + general model for 20-23 GB cards and the alternative to
+    # Qwen3.8 27B above with fewer active parameters: MoE with 25.2B total and
+    # 3.8B active. Q4_K_M weight is 16-18 GB; the 20 GB gate assumes Gemma 4's
+    # sliding-window attention keeps the 16k KV cache small. Not benchmarked
+    # here (no GPU).
+    "Gemma 4 26B|gemma4:26b|0|20|16384||any|any_gpu|vision,general|MoE 25B/3.8B-active; thinking + vision; ~18 GB weights"
+
+    # Mid-GPU vision + general model (12-19 GB VRAM). Actual Q4_K_M weight is
     # 7.7 GB; 16384 ctx plus KV cache fits a 12 GB card.
     "Gemma 4 12B|gemma4:12b|0|12|16384||any|any_gpu|vision,general|Native multimodal; mid-GPU tier; ~7.7 GB weights"
 
-    # Best GPU coding model for hosts with 14–19 GB VRAM (below Qwen3.8's gate).
-    # No newer Qwen coder exists at this size, so this stays the pick here.
-    # Actual Q4_K_M weight is 9.0 GB; the 32768 context needs more KV cache
-    # headroom than Gemma 4 12B's 16384, so the gate matches the 14 GB tier.
-    "Qwen2.5-Coder 14B|qwen2.5-coder:14b|0|14|32768||any|any_gpu|coding|Reliable tool-call format; mid-GPU tier; ~9 GB weights"
+    # GPU coding model for 12-23 GB cards: the CPU tier's MiMo-V2.6 9B at
+    # Q8_0 (10 GB) with a 32k context. At Q4_K_M and 16k it used ~1 GB above
+    # its weights on CPU; the 12 GB gate extrapolates from that. Replaces
+    # qwen2.5-coder:14b, whose 7B and 1.5B siblings write tool calls as plain
+    # text.
+    "MiMo-V2.6 9B Q8|mimo-v2.6:9b-q8_0|0|12|32768||any|any_gpu|coding|Code + agent fine-tune of Qwen3.5-9B at Q8; tools + vision; ~10 GB"
 
     # ── CUDA models (NVIDIA CUDA, ≥ 24 GB VRAM) ─────────────────────────────
     # MoE alternative to Qwen3.8 27B: 33B total / 3B active → faster tokens at
     # similar VRAM, built for agentic coding and long-horizon work. Actual
     # weight is 20 GB; with KV cache at 32k ctx it needs a 24 GB card.
     "Laguna XS 2.1|laguna-xs-2.1|0|24|32768||any|cuda|coding|MoE 33B/3B-active; agentic coding; faster than dense 27B; ~20 GB weights"
-
-    # Dense alternative to Qwen3.8 27B for general chat, vision and reasoning
-    # from a different model family. Actual weight is 19 GB; at 16k ctx it
-    # needs a 24 GB card. See modelfiles/Modelfile.gemma4-31b.
-    "Gemma 4 31B|gemma4:31b|0|24|16384||any|cuda|vision,general|Dense Gemma 4; thinking + vision; 24 GB tier; ~19 GB weights"
 
     # ── CPU models (any architecture) ───────────────────────────────────────
     # Gates are the resident memory measured with Ollama 0.40.18 at the listed
@@ -190,11 +200,11 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "qwen3.8:27b" "laguna-xs-2.1" "qwen2.5-coder:14b" "mimo-v2.6:9b" "qwen3.5:4b" "qwen3.5:0.8b" )
+CODING_PRIORITY=(     "flint:40b" "qwen3.8:27b" "laguna-xs-2.1" "mimo-v2.6:9b-q8_0" "mimo-v2.6:9b" "qwen3.5:4b" "qwen3.5:0.8b" )
 # shellcheck disable=SC2034
-VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:0.8b" )
+VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:0.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "lfm3:1.7b" )
+GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "lfm3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
 # TASK_MODEL (see stack.yml) needs a tiny model that is always created regardless
