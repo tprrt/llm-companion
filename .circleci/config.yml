@@ -54,7 +54,7 @@ executors:
     resource_class: small
   docker-sonarcloud:
     docker:
-      - image: cimg/node:20.8.1
+      - image: cimg/node:26.13.1
     resource_class: medium
 
 jobs:
