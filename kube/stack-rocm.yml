@@ -176,7 +176,6 @@ data:
     use_default_settings: true
 
     server:
-      secret_key: "llm-companion-searxng-local-only"
       limiter: false
       image_proxy: false
 
@@ -466,6 +465,12 @@ spec:
           value: "false"
         - name: INSTANCE_NAME
           value: "llm-companion"
+        # Overrides server.secret_key (signs SearXNG's cookies and URLs).
+        - name: SEARXNG_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: llm-companion-secrets
+              key: searxng-secret-key
       livenessProbe:
         exec:
           command:

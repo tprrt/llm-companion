@@ -105,6 +105,28 @@
         dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/open-terminal-api-key.env"
         mode: "0600"
 
+# ── Generate SearXNG secret key ───────────────────────────────────────────────
+- name: Check if SearXNG secret key file exists
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-secret.env"
+  register: llm_stack_searxng_secret_file
+
+- name: Generate SearXNG secret key
+  when: not llm_stack_searxng_secret_file.stat.exists
+  no_log: true # secret material — never let this block reach -v output or logs
+  block:
+    - name: Generate random hex secret
+      ansible.builtin.command:
+        cmd: openssl rand -hex 32
+      register: llm_stack_searxng_secret_raw
+      changed_when: false
+
+    - name: Write SearXNG secret to file
+      ansible.builtin.copy:
+        content: "SEARXNG_SECRET={{ llm_stack_searxng_secret_raw.stdout }}\n"
+        dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-secret.env"
+        mode: "0600"
+
 # ── Read secrets from files ───────────────────────────────────────────────────
 - name: Read Ollama API key
   ansible.builtin.command:
@@ -140,6 +162,18 @@
 - name: Parse Open Terminal API key value
   ansible.builtin.set_fact:
     llm_stack_open_terminal_key: "{{ llm_stack_open_terminal_key_line.stdout | regex_replace('^OPEN_TERMINAL_API_KEY=', '') }}"
+  no_log: true # secret material — never let this reach -v output or logs
+
+- name: Read SearXNG secret key
+  ansible.builtin.command:
+    cmd: grep SEARXNG_SECRET "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-secret.env"
+  register: llm_stack_searxng_secret_line
+  changed_when: false
+  no_log: true # secret material — never let this reach -v output or logs
+
+- name: Parse SearXNG secret key value
+  ansible.builtin.set_fact:
+    llm_stack_searxng_secret: "{{ llm_stack_searxng_secret_line.stdout | regex_replace('^SEARXNG_SECRET=', '') }}"
   no_log: true # secret material — never let this reach -v output or logs
 
 # ── Render and place secrets YAML ─────────────────────────────────────────────
