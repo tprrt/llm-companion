@@ -1,6 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
 # SPDX-License-Identifier: GPL-3.0-only
 ---
+- name: Check llm_allowed_networks entries are IP addresses or CIDR networks
+  ansible.builtin.assert:
+    that: item is match('^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$')
+    fail_msg: "llm_allowed_networks: '{{ item }}' is not an IP address or CIDR network"
+    quiet: true
+  loop: "{{ llm_allowed_networks }}"
+
 # ── RedHat (Fedora, RHEL, CentOS) — firewalld ────────────────────────────────
 - name: Install firewalld (RedHat)
   ansible.builtin.dnf:
@@ -17,21 +24,56 @@
   become: true
   when: ansible_facts['os_family'] == "RedHat"
 
-- name: Open web port in firewalld (RedHat)
+# With llm_allowed_networks empty, the web port is open to every source.
+# Otherwise each network gets a rich rule and the plain port rule is removed.
+# Rich rules for this port whose source is no longer listed are removed too.
+- name: Open web port to every source in firewalld (RedHat)
   ansible.builtin.command:
-    cmd: firewall-cmd --permanent --add-port={{ llm_web_port }}/tcp
+    cmd: firewall-cmd --permanent --{{ 'add' if llm_allowed_networks | length == 0 else 'remove' }}-port={{ llm_web_port }}/tcp
   become: true
   when: ansible_facts['os_family'] == "RedHat"
-  register: firewall_add_port
-  # firewall-cmd prints "ALREADY_ENABLED" when the rule already exists.
-  changed_when: "'ALREADY_ENABLED' not in firewall_add_port.stdout"
+  register: firewall_port
+  # firewall-cmd warns ALREADY_ENABLED / NOT_ENABLED when there is nothing to do.
+  changed_when: "'ALREADY_ENABLED' not in firewall_port.stderr + firewall_port.stdout and 'NOT_ENABLED' not in firewall_port.stderr + firewall_port.stdout"
+
+- name: List firewalld rich rules (RedHat)
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --list-rich-rules
+  become: true
+  when: ansible_facts['os_family'] == "RedHat"
+  register: firewall_rich_rules
+  changed_when: false
+
+- name: Remove rich rules for sources no longer allowed (RedHat)
+  ansible.builtin.command:
+    argv: [firewall-cmd, --permanent, "--remove-rich-rule={{ item }}"]
+  become: true
+  loop: >-
+    {{ firewall_rich_rules.stdout_lines
+       | select('search', 'port port="' ~ llm_web_port ~ '" protocol="tcp" accept')
+       | reject('in', firewall_wanted_rich_rules)
+       | list }}
+  when: ansible_facts['os_family'] == "RedHat"
+  register: firewall_rich_removed
+  changed_when: true
+
+- name: Allow web port from each allowed network in firewalld (RedHat)
+  ansible.builtin.command:
+    argv: [firewall-cmd, --permanent, "--add-rich-rule={{ item }}"]
+  become: true
+  loop: "{{ firewall_wanted_rich_rules }}"
+  when: ansible_facts['os_family'] == "RedHat"
+  register: firewall_rich_added
+  changed_when: "'ALREADY_ENABLED' not in firewall_rich_added.stderr + firewall_rich_added.stdout"
 
 - name: Reload firewalld to apply new rules (RedHat)
   ansible.builtin.command:
     cmd: firewall-cmd --reload
   become: true
-  when: ansible_facts['os_family'] == "RedHat" and firewall_add_port.changed
-  changed_when: firewall_add_port.changed
+  when: >-
+    ansible_facts['os_family'] == "RedHat" and
+    (firewall_port.changed or firewall_rich_removed.changed or firewall_rich_added.changed)
+  changed_when: true
 
 # ── Debian (Debian, Ubuntu) — ufw ────────────────────────────────────────────
 - name: Install ufw (Debian)
@@ -50,13 +92,44 @@
   register: firewall_ufw_allow_ssh
   changed_when: "'Rules updated' in firewall_ufw_allow_ssh.stdout"
 
-- name: Allow web port through ufw (Debian)
+# Same policy as firewalld above: open to every source when
+# llm_allowed_networks is empty, otherwise one rule per allowed network.
+- name: Open web port to every source through ufw (Debian)
   ansible.builtin.command:
-    cmd: ufw allow {{ llm_web_port }}/tcp
+    cmd: ufw {{ '' if llm_allowed_networks | length == 0 else 'delete' }} allow {{ llm_web_port }}/tcp
   become: true
   when: ansible_facts['os_family'] == "Debian"
   register: firewall_ufw_allow_web
-  changed_when: "'Rules updated' in firewall_ufw_allow_web.stdout"
+  changed_when: "'Rules updated' in firewall_ufw_allow_web.stdout or 'Rule deleted' in firewall_ufw_allow_web.stdout"
+
+- name: List ufw rules (Debian)
+  ansible.builtin.command:
+    cmd: ufw show added
+  become: true
+  when: ansible_facts['os_family'] == "Debian"
+  register: firewall_ufw_rules
+  changed_when: false
+
+- name: Remove ufw rules for sources no longer allowed (Debian)
+  ansible.builtin.command:
+    argv: "{{ ['ufw', 'delete'] + (item | regex_replace('^ufw ', '') | split(' ')) }}"
+  become: true
+  loop: >-
+    {{ firewall_ufw_rules.stdout_lines
+       | select('match', '^ufw allow from \\S+ to any port ' ~ llm_web_port ~ ' proto tcp$')
+       | reject('in', firewall_wanted_ufw_rules)
+       | list }}
+  when: ansible_facts['os_family'] == "Debian"
+  changed_when: true
+
+- name: Allow web port from each allowed network through ufw (Debian)
+  ansible.builtin.command:
+    argv: "{{ item | split(' ') }}"
+  become: true
+  loop: "{{ firewall_wanted_ufw_rules }}"
+  when: ansible_facts['os_family'] == "Debian"
+  register: firewall_ufw_allow_net
+  changed_when: "'Rule added' in firewall_ufw_allow_net.stdout or 'Rules updated' in firewall_ufw_allow_net.stdout"
 
 - name: Check ufw status (Debian)
   ansible.builtin.command:

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# Rules for llm_allowed_networks, written exactly as `firewall-cmd
+# --list-rich-rules` and `ufw show added` print them, so existing rules can
+# be compared against these strings.
+firewall_wanted_rich_rules: >-
+  {%- set rules = [] -%}
+  {%- for net in llm_allowed_networks -%}
+  {%- set _ = rules.append('rule family="' ~ ('ipv6' if ':' in net else 'ipv4') ~ '" source address="' ~ net
+                           ~ '" port port="' ~ llm_web_port ~ '" protocol="tcp" accept') -%}
+  {%- endfor -%}
+  {{ rules }}
+firewall_wanted_ufw_rules: >-
+  {%- set rules = [] -%}
+  {%- for net in llm_allowed_networks -%}
+  {%- set _ = rules.append('ufw allow from ' ~ net ~ ' to any port ' ~ llm_web_port ~ ' proto tcp') -%}
+  {%- endfor -%}
+  {{ rules }}

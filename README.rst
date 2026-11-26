@@ -584,9 +584,20 @@ Run the Ansible playbook
 The playbook handles everything in order:
 
 - **common**: creates required directories, enables ``loginctl linger``, sets up subuid/subgid
-- **firewall**: opens port 8080 (firewalld on Fedora, ufw on Debian)
+- **firewall**: opens port 8080 (firewalld on Fedora, ufw on Debian), to
+  every source or only to ``llm_allowed_networks``
 - **podman**: installs Podman + buildah, sets SELinux boolean, builds the Ollama image
 - **llm_stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
+
+To accept connections only from your LAN or VPN, list the networks in
+``ansible/group_vars/all.yml`` or in the host's inventory entry:
+
+.. code-block:: yaml
+
+   llm_allowed_networks: ["192.168.1.0/24", "100.64.0.0/10"]
+
+Networks removed from the list later have their rules removed on the next
+playbook run; an empty list opens the port to every source again.
 
 Or use the hardware-aware setup script
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1013,8 +1024,12 @@ SSH into the VM and run the pull script directly:
 
 .. code-block:: bash
 
-   sudo firewall-cmd --list-ports        # should show 8080/tcp
+   sudo firewall-cmd --list-ports        # should show 8080/tcp, unless restricted
+   sudo firewall-cmd --list-rich-rules   # one rule per llm_allowed_networks entry
    curl http://localhost:8080/           # verify Caddy responds
+
+If ``llm_allowed_networks`` is set, the client's address must be in one of
+the listed networks.
 
 **Slow replies or long reasoning blocks from Qwen3.5, MiMo or LFM3**
 

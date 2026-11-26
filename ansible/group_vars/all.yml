@@ -5,6 +5,10 @@
 # Host port exposed by Caddy (must match stack.yml hostPort and firewall rule)
 llm_web_port: 8080
 
+# Networks allowed to reach llm_web_port, as IP addresses or CIDR blocks, e.g.
+# ["192.168.1.0/24", "100.64.0.0/10"]. Empty opens the port to every source.
+llm_allowed_networks: []
+
 # Directory containing the llm-companion project files on the TARGET host.
 # Ansible copies stack.yml from here. The Dockerfile must also be here.
 llm_project_dir: "{{ ansible_facts['user_dir'] }}/llm-companion"
