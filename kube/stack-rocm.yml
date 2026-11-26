@@ -318,10 +318,11 @@ spec:
           value: "false"
         - name: ENABLE_SIGNUP
           value: "true"
-        # Auto-activate new users instead of leaving them in the pending state.
-        # Safe for a private LAN/VPN deployment.
+        # New sign-ups stay pending until an admin approves them: anyone who can
+        # reach :8080 can register, and an active user gets the models and,
+        # once connected, Open Terminal's shell.
         - name: DEFAULT_USER_ROLE
-          value: "user"
+          value: "pending"
         # Allow generating API keys from the UI (Settings → Account).
         - name: ENABLE_API_KEYS
           value: "true"
