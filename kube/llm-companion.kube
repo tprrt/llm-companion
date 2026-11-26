@@ -12,7 +12,7 @@
 #   # Ansible handles this automatically — manual steps for reference:
 #   mkdir -p ~/.config/containers/systemd
 #   cp llm-companion.kube ~/.config/containers/systemd/
-#   cp stack.yml          ~/.config/containers/systemd/
+#   ../scripts/render-stack.sh cpu ~/.config/containers/systemd/stack.yml
 #   # Generate secrets first (see ansible/roles/llm_stack/):
 #   # podman play kube ~/.config/containers/systemd/llm-companion-secrets.yml
 #   systemctl --user daemon-reload
@@ -32,7 +32,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Kube]
-# Path where Ansible copies stack.yml (the Kubernetes Pod manifest).
+# Path where Ansible renders stack.yml (the Kubernetes Pod manifest).
 Yaml=%h/.config/containers/systemd/stack.yml
 
 # Auto-update images when new versions are available via the registry.

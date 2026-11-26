@@ -1,33 +1,50 @@
 # SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
 # SPDX-License-Identifier: GPL-3.0-only
+{# Source template: Ansible renders it per host; scripts/render-stack.sh renders it by hand. #}
 
 # =============================================================================
-# stack-rocm.yml — AMD ROCm GPU variant of the llm-companion stack
+# stack.yml — Kubernetes Pod manifest for the llm-companion stack
 #
-# This file is identical to stack.yml except for the Ollama container:
-#   - Uses the ollama-rocm image (built with ROCm support)
-#   - OLLAMA_CONTEXT_LENGTH increased to 32768 (for the 32k GPU models)
-#   - ROCR_VISIBLE_DEVICES=all to expose all ROCm-capable GPUs
-#   - securityContext.privileged=true (required for /dev/kfd and /dev/dri
-#     access in rootless Podman; see note below)
+# Rendered from kube/stack.yml.j2 for ollama_build_target={{ ollama_build_target }}.
+# Edit the template, not this file: the next playbook run overwrites it.
 #
-# For k3s Phase 2:
-#   Replace privileged: true with the AMD GPU device plugin resource request:
-#     resources:
-#       limits:
-#         amd.com/gpu: "1"
-#   And ensure the amd-gpu-operator or device plugin DaemonSet is installed.
+# Contains (in order):
+#   1. PersistentVolumeClaims (ollama-models, open-webui-data,
+#      open-terminal-data, caddy-data)
+#   2. ConfigMap with the Caddyfile (from caddy/Caddyfile) and SearXNG settings
+#   3. Pod with five containers: ollama, open-webui, open-terminal, searxng,
+#      caddy
 #
-# Usage:
+# Pod mode (single-pod networking):
+#   All containers share the same network namespace. They communicate
+#   via localhost (127.0.0.1), not via DNS names.
+#     - Ollama listens on localhost:11434
+#     - Open WebUI listens on localhost:3000  (not 8080 — Caddy owns :8080)
+#     - Caddy listens on localhost:8080 and is the only container with a
+#       hostPort published to the outside world.
+#
+# Ollama variants (ollama_build_target):
+#   cpu   localhost/ollama-cpu image, 16k default context, no capabilities.
+#   rocm  localhost/ollama-rocm image, 32k default context, privileged for
+#         /dev/kfd and /dev/dri access in rootless Podman. Host prerequisites:
+#           sudo usermod -aG render,video $USER   # log out and back in
+#           sudo dnf install rocm-hip rocm-opencl rocm-smi
+#   cuda  localhost/ollama-cuda image, 32k default context, GPUs requested
+#         through CDI (nvidia.com/gpu=all); the podman Ansible role installs
+#         the NVIDIA Container Toolkit and generates the CDI spec.
+#
+# PVC behaviour:
+#   podman play kube  → creates named Podman volumes (stored in ~/.local/share/
+#                        containers/storage/volumes/). No StorageClass needed.
+#   k3s / Kubernetes  → PVCs are created in the cluster; a StorageClass (e.g.
+#                        local-path) must be configured.
+#
+# How to apply by hand (Fedora / rootless Podman):
+#   ./scripts/render-stack.sh cpu > ~/.config/containers/systemd/stack.yml
 #   podman play kube ~/.config/containers/systemd/llm-companion-secrets.yml
-#   podman play kube ~/.config/containers/systemd/stack-rocm.yml --replace
-#
-# Prerequisites on the host:
-#   sudo usermod -aG render,video $USER   # logout/login required after
-#   sudo dnf install rocm-hip rocm-opencl rocm-smi
-#   rocminfo | grep gfx   # note your gfx version
+#   podman play kube ~/.config/containers/systemd/stack.yml --replace
+#   # Or let the llm-companion.kube Quadlet manage it via systemd.
 # =============================================================================
-
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -85,8 +102,9 @@ spec:
       storage: 1Gi
 
 ---
-# ConfigMap with embedded Caddyfile.
-# Identical to the one in stack.yml — all addresses use localhost.
+# ConfigMap with the Caddyfile and SearXNG settings.
+# All addresses use localhost because all containers share the pod network namespace.
+# The Caddyfile is caddy/Caddyfile, inserted at render time.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -95,82 +113,7 @@ metadata:
     app: llm-companion
 data:
   Caddyfile: |
-    {
-      # Disable the admin API — not needed for this setup.
-      admin off
-
-      # Disable HTTPS redirection — we're on an internal network.
-      # Remove this block if you enable TLS below.
-      auto_https off
-    }
-
-    :8080 {
-      # ── TLS (disabled by default) ──────────────────────────────────────
-      # WARNING: plain HTTP only — do NOT expose port 8080 to the public
-      # internet without enabling TLS. Safe for LAN / VPN use only.
-      # Uncomment to enable a self-signed cert (trustable on LAN/VPN):
-      # tls internal
-      # Uncomment for ACME/Let's Encrypt with a public domain:
-      # tls your@email.com
-
-      # ── Ollama API — Bearer token protected ────────────────────────────
-      # Prefixed with /ollama/ to avoid conflicting with Open WebUI's own /api/.
-      # Clients: use http://<host>:8080/ollama/api/ and /ollama/v1/
-      @ollama_api {
-        path /ollama/api /ollama/api/* /ollama/v1 /ollama/v1/*
-      }
-
-      handle @ollama_api {
-        # Reject requests without the correct Bearer token.
-        @unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
-        respond @unauthorized "Unauthorized" 401
-
-        # Strip the /ollama prefix before forwarding to Ollama.
-        uri strip_prefix /ollama
-
-        # Forward authenticated requests to Ollama (localhost — shared pod network).
-        reverse_proxy localhost:11434 {
-          # Pass the client's real IP for logging.
-          header_up X-Real-IP {remote_host}
-          # Strip the Authorization header before forwarding — Ollama
-          # doesn't need it and we don't want it in logs.
-          header_up -Authorization
-        }
-      }
-
-      # ── SearXNG — Bearer token protected ──────────────────────────────
-      # Clients: use http://<host>:8080/searxng/
-      @searxng {
-        path /searxng /searxng/*
-      }
-
-      handle @searxng {
-        # Reject requests without the correct Bearer token.
-        @unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
-        respond @unauthorized "Unauthorized" 401
-
-        uri strip_prefix /searxng
-        reverse_proxy localhost:8888 {
-          header_up X-Real-IP {remote_host}
-          header_up -Authorization
-        }
-      }
-
-      # ── Open WebUI — no extra auth (has its own account system) ────────
-      # Open WebUI runs on port 3000 (not 8080) to avoid conflicting with Caddy.
-      handle {
-        reverse_proxy localhost:3000 {
-          header_up X-Real-IP {remote_host}
-        }
-      }
-
-      # ── Logging ────────────────────────────────────────────────────────
-      log {
-        output stderr
-        format console
-        level INFO
-      }
-    }
+{{ lookup('ansible.builtin.file', llm_repo_dir ~ '/caddy/Caddyfile') | replace('\t', '  ') | indent(4, first=true) }}
 
   searxng-settings.yml: |
     use_default_settings: true
@@ -245,16 +188,21 @@ spec:
           mountPath: /app/backend/data
 
   containers:
-    # ── Ollama (ROCm GPU variant) ─────────────────────────────────────────────
+    # ── Ollama ───────────────────────────────────────────────────────────────
     - name: ollama # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
-      image: localhost/ollama-rocm:latest # NOSONAR — S6596: locally built image pinned at build time, no registry tag needed
+      image: localhost/ollama-{{ ollama_build_target }}:latest # NOSONAR — S6596: locally built image pinned at build time, no registry tag needed
       env:
         # Listen on all interfaces within the pod network namespace.
         - name: OLLAMA_HOST
           value: "0.0.0.0:11434"
+{% if ollama_build_target == 'cpu' %}
+        - name: OLLAMA_CONTEXT_LENGTH
+          value: "16384"
+{% else %}
         # Larger context window for the 32k GPU models (e.g. Qwen3.8 27B).
         - name: OLLAMA_CONTEXT_LENGTH
           value: "32768"
+{% endif %}
         - name: OLLAMA_KEEP_ALIVE
           value: "10m"
         # Room for the chat, task and embedding models at once: with 1, every
@@ -268,14 +216,16 @@ spec:
           value: "http://localhost:8080"
         - name: ANONYMIZED_TELEMETRY
           value: "false"
+{% if ollama_build_target == 'rocm' %}
         # Expose all ROCm-capable GPUs to Ollama.
         - name: ROCR_VISIBLE_DEVICES
           value: "all"
-        # Uncomment and set if your GPU needs a GFX version override.
-        # Find your version with: rocminfo | grep gfx
-        # Common values: gfx1010 (RX 5700), gfx1030 (RX 6800), gfx1100 (RX 7900)
-        # - name: HSA_OVERRIDE_GFX_VERSION
-        #   value: "11.0.0"
+{% if ollama_hsa_override_gfx_version %}
+        # GFX version override for GPUs ROCm does not support directly.
+        - name: HSA_OVERRIDE_GFX_VERSION
+          value: "{{ ollama_hsa_override_gfx_version }}"
+{% endif %}
+{% endif %}
       livenessProbe:
         exec:
           command:
@@ -292,17 +242,30 @@ spec:
         initialDelaySeconds: 10
         periodSeconds: 10
         timeoutSeconds: 10
+{% if ollama_build_target == 'rocm' %}
       securityContext:
         # privileged: true is required for rootless Podman to access /dev/kfd
         # and /dev/dri (AMD GPU devices). Without this, ROCm cannot enumerate
         # the GPU and Ollama falls back to CPU inference.
         #
-        # For k3s Phase 2: replace this with the AMD GPU device plugin:
+        # For k3s: replace this with the AMD GPU device plugin:
         #   resources:
         #     limits:
         #       amd.com/gpu: "1"
         # and remove privileged: true.
         privileged: true # NOSONAR — S6428: required for rootless Podman to access /dev/kfd and /dev/dri; replaced by AMD GPU device plugin in k3s
+{% else %}
+{% if ollama_build_target == 'cuda' %}
+      resources:
+        limits:
+          "nvidia.com/gpu=all": 1 # NOSONAR — S6428: CDI GPU device request; requires the NVIDIA Container Toolkit + generated CDI spec (see ansible/roles/podman)
+{% endif %}
+      securityContext:
+        # Drop all capabilities for least-privilege operation.{{ ' CDI injects the\n        # GPU device nodes and libraries; Ollama needs no capability to use them.' if ollama_build_target == 'cuda' else '' }}
+        capabilities:
+          drop:
+            - ALL
+{% endif %}
       volumeMounts:
         - name: ollama-models
           mountPath: /var/lib/ollama/models

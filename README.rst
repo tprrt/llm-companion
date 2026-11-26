@@ -13,7 +13,7 @@ llm-companion — Podman Kubernetes Pod stack for Fedora Server
 =============================================================
 
 Rootless Ollama server for **Fedora Server 41+** and **Debian 13+**, managed via
-a single Kubernetes Pod manifest (``kube/stack.yml``) deployed by Ansible.
+a single Kubernetes Pod manifest (rendered from ``kube/stack.yml.j2``) deployed by Ansible.
 Multi-arch ready: x86-64 (CPU, AMD ROCm or NVIDIA CUDA GPU) and ARM64.
 
 ----
@@ -74,9 +74,7 @@ Directory layout
    ├── Dockerfile                    # Multi-stage: cpu, rocm and cuda targets
    │
    ├── kube/                         # Kubernetes Pod manifests and Quadlet unit
-   │   ├── stack.yml                 # PVCs + ConfigMap + Pod (CPU variant)
-   │   ├── stack-rocm.yml            # Same, AMD ROCm GPU variant
-   │   ├── stack-cuda.yml            # Same, NVIDIA CUDA GPU variant
+   │   ├── stack.yml.j2              # PVCs + ConfigMap + Pod; rendered per cpu / rocm / cuda
    │   └── llm-companion.kube        # Quadlet .kube unit — manages the pod via systemd
    │
    ├── ansible/                      # Ansible playbook and roles
@@ -91,7 +89,7 @@ Directory layout
    │       └── llm_stack/            # Copy manifest, generate secrets, enable service
    │
    ├── caddy/
-   │   └── Caddyfile                 # Canonical reference — embedded in kube/stack.yml ConfigMap
+   │   └── Caddyfile                 # The Caddy config, embedded in the rendered manifest
    │
    ├── modelfiles/                   # Manual alternatives to scripts/pull-models.sh
    │   ├── Modelfile.flint-40b
@@ -360,7 +358,7 @@ Deploy in a QEMU/KVM VM
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 ``vm.sh`` provisions a QEMU/KVM VM that runs the full stack — same Ansible playbook,
-same ``kube/stack.yml``, same build process. Use it for local testing or to deploy the
+same ``kube/stack.yml.j2``, same build process. Use it for local testing or to deploy the
 VM on a remote server.
 
 Host prerequisites
@@ -587,7 +585,7 @@ The playbook handles everything in order:
 - **firewall**: opens port 8080 (firewalld on Fedora, ufw on Debian), to
   every source or only to ``llm_allowed_networks``
 - **podman**: installs Podman + buildah, sets SELinux boolean, builds the Ollama image
-- **llm_stack**: copies ``kube/stack.yml``, generates API key and WebUI secret, installs and starts the service
+- **llm_stack**: renders ``kube/stack.yml.j2`` for the host's GPU, generates API key and secrets, installs and enables the service
 
 To accept connections only from your LAN or VPN, list the networks in
 ``ansible/group_vars/all.yml`` or in the host's inventory entry:
@@ -760,20 +758,22 @@ Run the Ansible playbook
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml \
        -e "ollama_build_target=rocm"
 
-This builds ``localhost/ollama-rocm:latest`` and deploys ``kube/stack-rocm.yml``
-(which sets ``ROCR_VISIBLE_DEVICES=all`` and ``securityContext.privileged: true``
-for ``/dev/kfd`` + ``/dev/dri`` access) as the active stack manifest.
+This builds ``localhost/ollama-rocm:latest`` and deploys the ROCm variant of
+the stack manifest, which sets ``ROCR_VISIBLE_DEVICES=all`` and
+``securityContext.privileged: true`` for ``/dev/kfd`` + ``/dev/dri`` access.
 
 .. warning::
 
-   ``kube/stack-rocm.yml`` runs the Ollama container in **privileged mode**.
+   The ROCm variant runs the Ollama container in **privileged mode**.
    This is required for AMD GPU access (``/dev/kfd``, ``/dev/dri``) but
    bypasses most kernel namespace isolation — a compromised container
    process can affect the host. Only deploy the ROCm variant on a
    dedicated, trusted host that is not shared with other workloads.
 
-Set ``HSA_OVERRIDE_GFX_VERSION`` in ``kube/stack-rocm.yml`` if your card needs it
-(uncomment the env var and set the value to your gfx version string).
+If your card needs ``HSA_OVERRIDE_GFX_VERSION``, set
+``ollama_hsa_override_gfx_version`` (e.g. ``"11.0.0"``) in
+``ansible/group_vars/all.yml`` or the host's inventory entry, then re-run the
+playbook.
 
 Pull GPU models
 ^^^^^^^^^^^^^^^
@@ -826,9 +826,9 @@ Run the Ansible playbook
 Or let ``scripts/setup-host.sh`` detect it automatically (see "Setup" above).
 
 This builds ``localhost/ollama-cuda:latest``, installs the NVIDIA Container
-Toolkit, generates a CDI spec, and deploys ``kube/stack-cuda.yml`` (which
-requests the GPU via ``resources.limits."nvidia.com/gpu=all": 1``) as the
-active stack manifest.
+Toolkit, generates a CDI spec, and deploys the CUDA variant of the stack
+manifest, which requests the GPU via
+``resources.limits."nvidia.com/gpu=all": 1``.
 
 Unlike the ROCm variant, this does **not** run the container in privileged
 mode — CDI grants access to only the GPU device, not the whole host.
@@ -847,7 +847,7 @@ entries), plus ``laguna-xs-2.1-32k`` (coding, CUDA only) from 24 GB.
 ARM64
 ~~~~~
 
-No code changes needed — the same Dockerfile ``cpu`` target, ``kube/stack.yml``,
+No code changes needed — the same Dockerfile ``cpu`` target, ``kube/stack.yml.j2``,
 Ansible playbook, and scripts work unchanged on ARM64.
 
 .. code-block:: bash
@@ -881,7 +881,7 @@ Updating the stack
    # Re-run the playbook to pick up any changes (idempotent):
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
 
-   # Pull pinned images and replace the pod (bump version tags in kube/stack.yml first):
+   # Pull pinned images and replace the pod (bump version tags in kube/stack.yml.j2 first):
    podman pull docker.io/library/caddy:2.11.9
    podman pull ghcr.io/open-webui/open-webui:v0.13.5
    podman pull ghcr.io/open-webui/open-terminal:0.18.6-slim
@@ -930,8 +930,9 @@ Useful commands
    # Pull a model manually
    podman exec -it llm-companion-ollama ollama pull qwen3.5:4b
 
-   # Reload Caddy config without restart (after updating kube/stack.yml ConfigMap)
-   podman exec llm-companion-caddy caddy reload --config /etc/caddy/Caddyfile
+   # Apply a Caddyfile change: edit caddy/Caddyfile, re-run the playbook, then
+   # restart (the ConfigMap is read when the pod is created)
+   systemctl --user restart llm-companion
 
    # Check SearXNG logs
    podman logs llm-companion-searxng
@@ -971,7 +972,7 @@ Check that SearXNG is running and responding:
 
 If SearXNG has not started yet, wait for the readiness probe (10 s initial delay).
 If the JSON response is missing, confirm ``formats: [html, json]`` is present in
-the ``searxng-settings.yml`` key of the ConfigMap in ``kube/stack.yml``.
+the ``searxng-settings.yml`` key of the ConfigMap in ``kube/stack.yml.j2``.
 
 ----
 

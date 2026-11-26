@@ -81,7 +81,7 @@
 
 # ── NVIDIA Container Toolkit (CUDA only) ──────────────────────────────────────
 # Podman's CDI (Container Device Interface) support needs the toolkit to
-# generate /etc/cdi/nvidia.yaml before kube/stack-cuda.yml's
+# generate /etc/cdi/nvidia.yaml before the cuda stack manifest's
 # resources.limits."nvidia.com/gpu=all" request can resolve to a real device.
 # Assumes the NVIDIA driver itself (nvidia-smi) is already installed by the
 # operator — same assumption already made for ROCm packages above.

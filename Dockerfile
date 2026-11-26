@@ -90,9 +90,9 @@ EXPOSE 11434
 # Same base image as cpu: the official ollama/ollama image already bundles
 # CUDA runtime libraries and detects a GPU automatically at runtime. Unlike
 # ROCm, no separate upstream image tag is needed — what makes CUDA actually
-# work is the NVIDIA Container Toolkit + CDI device request in
-# kube/stack-cuda.yml (see ansible/roles/podman for toolkit installation),
-# not anything in this stage.
+# work is the NVIDIA Container Toolkit + CDI device request in the cuda
+# variant of kube/stack.yml.j2 (see ansible/roles/podman for toolkit
+# installation), not anything in this stage.
 # Build with: podman build --target cuda -t ollama-cuda .
 # -----------------------------------------------------------------------------
 FROM docker.io/ollama/ollama:0.40.18 AS cuda

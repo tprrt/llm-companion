@@ -10,7 +10,7 @@
 #
 # Container health (via podman inspect):
 #   Reads Podman's native health state, which is driven by the livenessProbe
-#   fields in stack.yml. No curl or exec into the container needed.
+#   fields in kube/stack.yml.j2. No curl or exec into the container needed.
 #   Ollama, Open WebUI, Open Terminal, SearXNG, Caddy → healthy / unhealthy
 #
 # Via Caddy (from VM host — only hostPort :8080 is published):

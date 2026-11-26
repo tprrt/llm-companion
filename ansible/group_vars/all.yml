@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 ---
 # ── Stack settings ────────────────────────────────────────────────────────────
-# Host port exposed by Caddy (must match stack.yml hostPort and firewall rule)
+# Host port exposed by Caddy (must match the hostPort in kube/stack.yml.j2)
 llm_web_port: 8080
 
 # Networks allowed to reach llm_web_port, as IP addresses or CIDR blocks, e.g.
@@ -10,8 +10,13 @@ llm_web_port: 8080
 llm_allowed_networks: []
 
 # Directory containing the llm-companion project files on the TARGET host.
-# Ansible copies stack.yml from here. The Dockerfile must also be here.
+# The Ollama image is built from the Dockerfile here, and the helper scripts
+# are installed from here.
 llm_project_dir: "{{ ansible_facts['user_dir'] }}/llm-companion"
+
+# This repository on the CONTROL node, where kube/stack.yml.j2 and
+# caddy/Caddyfile are read to render the stack manifest.
+llm_repo_dir: "{{ playbook_dir }}/.."
 
 # ── Model pulling ────────────────────────────────────────────────────────────
 # Set to true to have Ansible start the stack and pull models automatically.
@@ -24,5 +29,8 @@ llm_pull_models: false
 # per-host override via ansible/inventory/host_vars/<hostname>.yml based on
 # detected hardware — see scripts/detect-hardware.sh.
 ollama_build_target: cpu
+# ROCm only: HSA_OVERRIDE_GFX_VERSION for GPUs ROCm does not support directly
+# (e.g. "11.0.0" for RDNA3). Find your GPU with: rocminfo | grep gfx
+ollama_hsa_override_gfx_version: ""
 # Image tag after build
 ollama_image_tag: "ollama-{{ ollama_build_target }}:latest"

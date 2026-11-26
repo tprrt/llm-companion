@@ -207,7 +207,7 @@ VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "mini
 GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "lfm3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "embeddinggemma:300m" )
-# TASK_MODEL (see stack.yml) needs a tiny model that is always created regardless
+# TASK_MODEL (see kube/stack.yml.j2) needs a tiny model that is always created regardless
 # of hardware tier, independent of whichever model wins the categories above —
 # otherwise Open WebUI's title-generation / search-query background tasks 404.
 # With thinking disabled (TASK_MODEL_PARAMS), qwen3.5:0.8b wrote a clean

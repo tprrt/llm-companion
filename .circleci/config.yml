@@ -13,8 +13,7 @@
 #   hadolint             — lint Dockerfile with Hadolint
 #   caddy-validate       — check Caddyfile formatting and syntax
 #   ansible-lint         — lint Ansible playbooks
-#   kube-validate        — validate Kubernetes YAML (stack*.yml, llm-companion.kube)
-#   check-caddyfile-sync — verify canonical Caddyfile matches ConfigMap copies in stack manifests
+#   kube-validate        — render kube/stack.yml.j2 per build target, validate with kubeconform
 #   check-spdx           — verify every source file carries an SPDX header
 # =============================================================================
 
@@ -135,9 +134,10 @@ jobs:
   # ---------------------------------------------------------------------------
   # kube-validate — schema-validate Kubernetes YAML with kubeconform
   #
-  # Covers: stack.yml, stack-rocm.yml, stack-cuda.yml (Pod manifests + PVCs
-  #         + ConfigMaps)
-  #         and llm-companion.kube (Quadlet Kube unit).
+  # Renders kube/stack.yml.j2 for the cpu, rocm and cuda build targets with
+  # scripts/render-stack.sh (the same Ansible template engine the playbook
+  # uses) and validates each result. caddy-validate checks the Caddyfile the
+  # template embeds.
   # ---------------------------------------------------------------------------
   kube-validate:
     executor: docker-alpine
@@ -147,9 +147,9 @@ jobs:
           # Pinned to a specific release and checksum-verified instead of
           # /releases/latest — an unpinned, unverified binary would execute
           # whatever was most recently pushed upstream with no integrity check.
-          name: Install kubeconform
+          name: Install kubeconform and ansible-core
           command: |
-            apk add --no-cache curl
+            apk add --no-cache curl bash python3 ansible-core
             KUBECONFORM_VERSION=v0.8.0
             KUBECONFORM_SHA256=9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
             curl -sSLO "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
@@ -157,75 +157,12 @@ jobs:
             tar -xz -C /usr/local/bin kubeconform -f kubeconform-linux-amd64.tar.gz
             rm kubeconform-linux-amd64.tar.gz
       - run:
-          name: Validate Kubernetes manifests
-          command: kubeconform -strict -summary kube/stack.yml kube/stack-rocm.yml kube/stack-cuda.yml kube/llm-companion.kube
-
-  # ---------------------------------------------------------------------------
-  # check-caddyfile-sync — verify the canonical Caddyfile matches the copy
-  #                        embedded in the stack*.yml ConfigMaps
-  #
-  # The Caddyfile is kept both as a standalone canonical reference (Caddyfile)
-  # and embedded inside three Kubernetes ConfigMaps. They can drift silently when
-  # only one copy is edited. This job extracts every embedded copy with the
-  # Python yaml parser, normalises whitespace (YAML literal blocks use spaces;
-  # the canonical uses tabs), and diffs against the canonical.
-  # ---------------------------------------------------------------------------
-  check-caddyfile-sync:
-    executor: docker-alpine
-    steps:
-      - checkout
-      - run:
-          name: Install Python YAML
-          command: apk add --no-cache python3 py3-yaml
-      - run:
-          name: Check Caddyfile is in sync with ConfigMaps in stack manifests
+          name: Render and validate the stack manifest for each build target
           command: |
-            python3 - \<<'PYEOF'
-            import sys, yaml
-
-            def normalize(text):
-                """Strip per-line leading whitespace and blank lines so that
-                YAML-space-indented and tab-indented copies compare equal.
-                SPDX header lines are present in the standalone canonical file
-                but not in the YAML-embedded ConfigMap copies — skip them."""
-                return "\n".join(
-                    line.expandtabs(2).strip()
-                    for line in text.splitlines()
-                    if line.strip() and not line.strip().startswith("# SPDX-")
-                )
-
-            canonical = open("caddy/Caddyfile").read()
-            canonical_norm = normalize(canonical)
-
-            ok = True
-            for manifest in ("kube/stack.yml", "kube/stack-rocm.yml", "kube/stack-cuda.yml"):
-                embedded = None
-                with open(manifest) as fh:
-                    for doc in yaml.safe_load_all(fh):
-                        if (
-                            doc
-                            and isinstance(doc, dict)
-                            and doc.get("kind") == "ConfigMap"
-                        ):
-                            embedded = doc["data"]["Caddyfile"]
-                            break
-                if embedded is None:
-                    print(f"ERROR: no ConfigMap found in {manifest}", file=sys.stderr)
-                    ok = False
-                    continue
-                if normalize(embedded) != canonical_norm:
-                    print(
-                        f"ERROR: Caddyfile in {manifest} ConfigMap is out of sync "
-                        f"with the canonical Caddyfile.\n"
-                        f"Edit the ConfigMap in {manifest} to match Caddyfile, then "
-                        f"re-run: podman play kube {manifest} --replace"
-                    )
-                    ok = False
-                else:
-                    print(f"OK: {manifest} ConfigMap Caddyfile matches canonical")
-
-            sys.exit(0 if ok else 1)
-            PYEOF
+            for target in cpu rocm cuda; do
+              ./scripts/render-stack.sh "${target}" "/tmp/stack-${target}.yml"
+            done
+            kubeconform -strict -summary /tmp/stack-cpu.yml /tmp/stack-rocm.yml /tmp/stack-cuda.yml
 
   # ---------------------------------------------------------------------------
   # check-spdx — ensure every source file has an SPDX-License-Identifier line
@@ -245,7 +182,7 @@ jobs:
             rc=0
             for f in \
               scripts/*.sh Dockerfile caddy/Caddyfile *.container *.network modelfiles/Modelfile.* \
-              kube/*.yml kube/*.kube *.properties \
+              kube/*.j2 kube/*.kube *.properties \
               $(find ansible -name '*.yml'); do
               [ -f "$f" ] || continue
               if ! grep -q "SPDX-License-Identifier:" "$f"; then
@@ -276,8 +213,6 @@ workflows:
       - ansible-lint:
           <<: *ignore-gh-pages
       - kube-validate:
-          <<: *ignore-gh-pages
-      - check-caddyfile-sync:
           <<: *ignore-gh-pages
       - check-spdx:
           <<: *ignore-gh-pages
