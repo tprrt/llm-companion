@@ -129,6 +129,30 @@
         dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-secret.env"
         mode: "0600"
 
+# ── Generate SearXNG API key ──────────────────────────────────────────────────
+# Separate from the Ollama API key, so a key handed to a search client does
+# not also unlock the models.
+- name: Check if SearXNG API key file exists
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-api-key.env"
+  register: llm_stack_searxng_api_key_file
+
+- name: Generate SearXNG API key
+  when: not llm_stack_searxng_api_key_file.stat.exists
+  no_log: true # secret material — never let this block reach -v output or logs
+  block:
+    - name: Generate random hex key
+      ansible.builtin.command:
+        cmd: openssl rand -hex 24
+      register: llm_stack_searxng_api_key_raw
+      changed_when: false
+
+    - name: Write SearXNG API key to file
+      ansible.builtin.copy:
+        content: "SEARXNG_API_KEY=sk-searxng-{{ llm_stack_searxng_api_key_raw.stdout }}\n"
+        dest: "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-api-key.env"
+        mode: "0600"
+
 # ── Read secrets from files ───────────────────────────────────────────────────
 - name: Read Ollama API key
   ansible.builtin.command:
@@ -176,6 +200,18 @@
 - name: Parse SearXNG secret key value
   ansible.builtin.set_fact:
     llm_stack_searxng_secret: "{{ llm_stack_searxng_secret_line.stdout | regex_replace('^SEARXNG_SECRET=', '') }}"
+  no_log: true # secret material — never let this reach -v output or logs
+
+- name: Read SearXNG API key
+  ansible.builtin.command:
+    cmd: grep SEARXNG_API_KEY "{{ ansible_facts['user_dir'] }}/.config/ollama/searxng-api-key.env"
+  register: llm_stack_searxng_api_key_line
+  changed_when: false
+  no_log: true # secret material — never let this reach -v output or logs
+
+- name: Parse SearXNG API key value
+  ansible.builtin.set_fact:
+    llm_stack_searxng_api_key: "{{ llm_stack_searxng_api_key_line.stdout | regex_replace('^SEARXNG_API_KEY=', '') }}"
   no_log: true # secret material — never let this reach -v output or logs
 
 # ── Render and place secrets YAML ─────────────────────────────────────────────

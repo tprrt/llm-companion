@@ -504,6 +504,12 @@ spec:
             secretKeyRef:
               name: llm-companion-secrets
               key: ollama-api-key
+        # API key for the /searxng/ route, separate from the Ollama key.
+        - name: SEARXNG_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-companion-secrets
+              key: searxng-api-key
 {% if llm_tls_hostnames %}
         # TLS on (llm_tls_hostnames): certificates from Caddy's local CA for
         # these names plus localhost, no HTTP-to-HTTPS redirect. See the

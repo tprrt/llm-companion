@@ -47,14 +47,15 @@
 	}
 
 	# ── SearXNG — Bearer token protected ──────────────────────────────
-	# Clients: use http://<host>:8080/searxng/
+	# Clients: use http://<host>:8080/searxng/ with the SearXNG API key,
+	# which is separate from the Ollama one.
 	@searxng {
 		path /searxng /searxng/*
 	}
 
 	handle @searxng {
 		# Reject requests without the correct Bearer token.
-		@unauthorized not header Authorization "Bearer {$OLLAMA_API_KEY}"
+		@unauthorized not header Authorization "Bearer {$SEARXNG_API_KEY}"
 		respond @unauthorized "Unauthorized" 401
 
 		uri strip_prefix /searxng

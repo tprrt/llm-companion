@@ -22,7 +22,8 @@
 # has no live deployment to test against.
 #
 # Requires: a pulled Ollama model (run scripts/pull-models.sh first), and
-# OLLAMA_API_KEY in $HOME/.config/ollama/api-key.env (same as check-services.sh).
+# OLLAMA_API_KEY in $HOME/.config/ollama/api-key.env and SEARXNG_API_KEY in
+# $HOME/.config/ollama/searxng-api-key.env (same as check-services.sh).
 #
 # Caveat: the SearXNG check can report no results if the host has no
 # outbound internet access to reach upstream search engines — that is not
@@ -36,6 +37,7 @@ set -uo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
+SEARXNG_API_KEY=$(grep -s SEARXNG_API_KEY "$HOME/.config/ollama/searxng-api-key.env" | cut -d= -f2- || true)
 # Caddy serves HTTPS on :8080 when llm_tls_hostnames is set. -k because the
 # certificate comes from Caddy's own local CA and this only talks to localhost.
 BASE_URL="http://localhost:8080"
@@ -46,7 +48,10 @@ if curl -sk -o /dev/null --connect-timeout 3 https://localhost:8080/ 2>/dev/null
 fi
 
 if [[ -z "${OLLAMA_API_KEY}" ]]; then
-    printf 'WARNING: no OLLAMA_API_KEY found at %s/.config/ollama/api-key.env — the authenticated Ollama and SearXNG checks below will fail with HTTP 401.\n' "${HOME}" >&2
+    printf 'WARNING: no OLLAMA_API_KEY found at %s/.config/ollama/api-key.env — the authenticated Ollama checks below will fail with HTTP 401.\n' "${HOME}" >&2
+fi
+if [[ -z "${SEARXNG_API_KEY}" ]]; then
+    printf 'WARNING: no SEARXNG_API_KEY found at %s/.config/ollama/searxng-api-key.env — the SearXNG check below will fail with HTTP 401.\n' "${HOME}" >&2
 fi
 
 rc=0
@@ -69,8 +74,8 @@ fail() {
 # on the last newline. The token is fed to curl via -K - (config from
 # stdin), not -H, so it never appears in ps/`/proc/*/cmdline`.
 get_bearer() {
-    local url="$1" maxtime="$2"
-    printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
+    local url="$1" maxtime="$2" key="${3:-${OLLAMA_API_KEY}}"
+    printf 'header = "Authorization: Bearer %s"\n' "${key}" \
         | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time "${maxtime}" -K - \
             -w '\n%{http_code}' "${url}" 2>/dev/null
 }
@@ -188,7 +193,7 @@ step_searxng() {
     printf '%b── SearXNG (search) ────────────────────────────────%b\n' "${CYAN}" "${NC}"
 
     local raw code json count
-    raw=$(get_bearer "${BASE_URL}/searxng/search?q=test&format=json" 20)
+    raw=$(get_bearer "${BASE_URL}/searxng/search?q=test&format=json" 20 "${SEARXNG_API_KEY}")
     code="${raw##*$'\n'}"
     json="${raw%$'\n'*}"
 
@@ -283,6 +288,26 @@ step_auth() {
         ok "Auth — empty Bearer token rejected (HTTP ${code})"
     else
         fail "Auth — empty Bearer token rejected" "Expected HTTP 401, got HTTP ${code:-<no response>}"
+    fi
+
+    # The SearXNG route checks its own key ({$SEARXNG_API_KEY}): same empty
+    # token check, and the Ollama key must not open it.
+    code=$(printf 'header = "Authorization: Bearer "\n' \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
+            "${BASE_URL}/searxng/" 2>/dev/null)
+    if [[ "${code}" == "401" ]]; then
+        ok "Auth — empty Bearer token rejected by SearXNG (HTTP ${code})"
+    else
+        fail "Auth — empty Bearer token rejected by SearXNG" "Expected HTTP 401, got HTTP ${code:-<no response>}"
+    fi
+
+    code=$(printf 'header = "Authorization: Bearer %s"\n' "${OLLAMA_API_KEY}" \
+        | curl "${TLS_OPTS[@]}" -s --connect-timeout 5 --max-time 10 -o /dev/null -w '%{http_code}' -K - \
+            "${BASE_URL}/searxng/" 2>/dev/null)
+    if [[ "${code}" == "401" ]]; then
+        ok "Auth — Ollama key rejected by SearXNG (HTTP ${code})"
+    else
+        fail "Auth — Ollama key rejected by SearXNG" "Expected HTTP 401, got HTTP ${code:-<no response>}"
     fi
 }
 

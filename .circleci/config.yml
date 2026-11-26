@@ -95,7 +95,7 @@ jobs:
   #
   # caddy fmt exits 1 if the file is not already formatted.
   # Fix locally with: caddy fmt --overwrite caddy/Caddyfile
-  # OLLAMA_API_KEY is set to a placeholder so {$OLLAMA_API_KEY} resolves
+  # OLLAMA_API_KEY and SEARXNG_API_KEY are set to placeholders so they resolve
   # during syntax validation without a real secret.
   # ---------------------------------------------------------------------------
   caddy-validate:
@@ -115,13 +115,13 @@ jobs:
             fi
       - run:
           name: Validate Caddyfile syntax
-          command: OLLAMA_API_KEY=ci-placeholder caddy validate --config caddy/Caddyfile
+          command: OLLAMA_API_KEY=ci-placeholder SEARXNG_API_KEY=ci-placeholder caddy validate --config caddy/Caddyfile
       - run:
           name: Validate Caddyfile syntax with TLS on
           # The environment kube/stack.yml.j2 gives Caddy when llm_tls_hostnames
           # is set.
           command: |
-            OLLAMA_API_KEY=ci-placeholder LLM_AUTO_HTTPS=disable_redirects \
+            OLLAMA_API_KEY=ci-placeholder SEARXNG_API_KEY=ci-placeholder LLM_AUTO_HTTPS=disable_redirects \
               LLM_TLS="tls internal" LLM_SITE_ADDRESS="localhost:8080, llm.lan:8080" \
               caddy validate --config caddy/Caddyfile
 

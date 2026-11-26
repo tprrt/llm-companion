@@ -16,7 +16,7 @@
 # Via Caddy (from VM host — only hostPort :8080 is published; HTTPS when TLS is on):
 #   Open WebUI    localhost:8080   GET /health         → HTTP 200
 #   Ollama        localhost:8080   GET /ollama/api/tags → HTTP 200 (Bearer token)
-#   SearXNG       localhost:8080   GET /searxng/        → HTTP 200 (Bearer token)
+#   SearXNG       localhost:8080   GET /searxng/        → HTTP 200 (SearXNG key)
 #
 # Installed by Ansible to $HOME/.local/bin/check-services.sh on the target host.
 # Also callable via: ./vm.sh check
@@ -27,6 +27,7 @@ set -uo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 
 OLLAMA_API_KEY=$(grep -s OLLAMA_API_KEY "$HOME/.config/ollama/api-key.env" | cut -d= -f2- || true)
+SEARXNG_API_KEY=$(grep -s SEARXNG_API_KEY "$HOME/.config/ollama/searxng-api-key.env" | cut -d= -f2- || true)
 
 # Caddy serves HTTPS on :8080 when llm_tls_hostnames is set. -k because the
 # certificate comes from Caddy's own local CA and this only talks to localhost.
@@ -91,6 +92,6 @@ pod_health_check "llm-companion-caddy"         "Caddy"          || rc=1
 printf '%b── Via Caddy (:8080) ───────────────────────────────%b\n' "${CYAN}" "${NC}"
 http_check "Open WebUI (:8080/health)"    "${BASE_URL}/health"                              || rc=1
 http_check "Ollama     (:8080/ollama/)"   "${BASE_URL}/ollama/api/tags"    "${OLLAMA_API_KEY}" || rc=1
-http_check "SearXNG    (:8080/searxng/)"  "${BASE_URL}/searxng/"           "${OLLAMA_API_KEY}" || rc=1
+http_check "SearXNG    (:8080/searxng/)"  "${BASE_URL}/searxng/"           "${SEARXNG_API_KEY}" || rc=1
 
 exit "$rc"
