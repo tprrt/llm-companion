@@ -204,7 +204,7 @@ spec:
     # (which would pull in the full dependency chain and OOM) and uses only
     # stdlib sqlite3.
     - name: open-webui-db-guard # NOSONAR — S6864/S6870/S6873/S6892/S6897 inapplicable
-      image: ghcr.io/open-webui/open-webui:v0.11.4 # keep in sync with the open-webui container below
+      image: ghcr.io/open-webui/open-webui:v0.13.5 # keep in sync with the open-webui container below
       command:
         - python3
         - -c
@@ -287,7 +287,7 @@ spec:
 
     # ── Open WebUI ───────────────────────────────────────────────────────────
     - name: open-webui # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
-      image: ghcr.io/open-webui/open-webui:v0.11.4
+      image: ghcr.io/open-webui/open-webui:v0.13.5
       env:
         # Open WebUI binds on port 3000 (not 8080) to avoid conflicting with Caddy.
         - name: PORT
