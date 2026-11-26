@@ -35,7 +35,7 @@ x-ignore-gh-pages: &ignore-gh-pages
 executors:
   docker-shellcheck:
     docker:
-      - image: koalaman/shellcheck-alpine:stable
+      - image: koalaman/shellcheck-alpine:v0.11.0
     resource_class: small
   docker-hadolint:
     docker:
@@ -50,7 +50,7 @@ executors:
     resource_class: small
   docker-alpine:
     docker:
-      - image: alpine:3.21
+      - image: alpine:3.24.4
     resource_class: small
   docker-sonarcloud:
     docker:
