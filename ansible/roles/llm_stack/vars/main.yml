@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# Podman volume backing the llm-open-webui-data PVC in kube/stack.yml.j2.
+llm_stack_webui_volume: llm-open-webui-data

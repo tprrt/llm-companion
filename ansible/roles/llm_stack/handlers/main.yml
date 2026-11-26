@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 Thomas Perrot <thomas.perrot@tupi.fr>
+# SPDX-License-Identifier: GPL-3.0-only
+---
+# Notified ("llm-companion changed") when the stack manifest, the secrets, the
+# Quadlet unit or the Ollama image changed. A running service is stopped, the
+# Open WebUI data volume is backed up (its schema migrations cannot be undone)
+# and the service is started again. A stopped service stays stopped: a first
+# deployment only enables it (see "Enable llm-companion Quadlet service").
+- name: Check whether llm-companion is running
+  ansible.builtin.systemd:
+    name: llm-companion
+    scope: user
+  register: llm_stack_service_state
+  failed_when: false
+  listen: llm-companion changed
+
+- name: Stop llm-companion for the update
+  ansible.builtin.systemd:
+    name: llm-companion
+    scope: user
+    state: stopped
+  when: llm_stack_service_state.status.ActiveState | default('') == 'active'
+  listen: llm-companion changed
+
+- name: Check whether the Open WebUI data volume exists
+  ansible.builtin.command:
+    cmd: podman volume exists {{ llm_stack_webui_volume }}
+  register: llm_stack_webui_volume_check
+  changed_when: false
+  failed_when: false
+  listen: llm-companion changed
+
+- name: Create the backup directory
+  ansible.builtin.file:
+    path: "{{ llm_backup_dir }}"
+    state: directory
+    mode: "0700"
+  when: llm_stack_webui_volume_check.rc == 0
+  listen: llm-companion changed
+
+- name: Back up the Open WebUI data volume
+  ansible.builtin.command:
+    cmd: >-
+      podman volume export {{ llm_stack_webui_volume }}
+      --output {{ llm_backup_dir }}/{{ llm_stack_webui_volume }}-{{ ansible_facts['date_time']['iso8601_basic_short'] }}.tar
+  when: llm_stack_webui_volume_check.rc == 0
+  changed_when: true
+  listen: llm-companion changed
+
+- name: List Open WebUI data backups
+  ansible.builtin.find:
+    paths: "{{ llm_backup_dir }}"
+    patterns: "{{ llm_stack_webui_volume }}-*.tar"
+  register: llm_stack_backups
+  when: llm_stack_webui_volume_check.rc == 0
+  listen: llm-companion changed
+
+- name: Keep only the newest llm_backup_keep backups
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ (llm_stack_backups.files | sort(attribute='mtime', reverse=true))[llm_backup_keep | int :] }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: llm_stack_webui_volume_check.rc == 0
+  listen: llm-companion changed
+
+- name: Start llm-companion after the update
+  ansible.builtin.systemd:
+    name: llm-companion
+    scope: user
+    state: started
+  when: llm_stack_service_state.status.ActiveState | default('') == 'active'
+  listen: llm-companion changed

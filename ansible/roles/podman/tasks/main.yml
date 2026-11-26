@@ -168,6 +168,7 @@
       -t {{ ollama_image_tag }} {{ llm_project_dir }}
   register: podman_ollama_build_result
   changed_when: podman_ollama_build_result.rc == 0
+  notify: llm-companion changed
   when: >-
     podman_ollama_image_check.rc != 0
     or ((podman_ollama_image_check.stdout | from_json)[0].Labels | default({}, true)).get('llm-companion.dockerfile-sha256')

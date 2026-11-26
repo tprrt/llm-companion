@@ -24,6 +24,13 @@ llm_project_dir: "{{ ansible_facts['user_dir'] }}/llm-companion"
 # caddy/Caddyfile are read to render the stack manifest.
 llm_repo_dir: "{{ playbook_dir }}/.."
 
+# ── Backups ──────────────────────────────────────────────────────────────────
+# When a playbook run changes the stack, the Open WebUI data volume (users,
+# chats, settings) is exported here before the service restarts. Only the
+# newest llm_backup_keep archives are kept.
+llm_backup_dir: "{{ ansible_facts['user_dir'] }}/llm-companion-backups"
+llm_backup_keep: 3
+
 # ── Model pulling ────────────────────────────────────────────────────────────
 # Set to true to have Ansible start the stack and pull models automatically.
 # Requires the service to be startable (i.e. not a cloud-init first-boot run).

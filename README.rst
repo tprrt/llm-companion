@@ -913,12 +913,28 @@ Updating the stack
    # Re-run the playbook to pick up any changes (idempotent):
    ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
 
-   # Pull pinned images and replace the pod (bump version tags in kube/stack.yml.j2 first):
+When the run changes the stack manifest, the secrets, the Quadlet unit or the
+Ollama image, the playbook stops a running service, exports the Open WebUI
+data volume (users, chats, settings) to ``~/llm-companion-backups/``, and
+starts the service again; it keeps the newest ``llm_backup_keep`` (3)
+archives. To restore one:
+
+.. code-block:: bash
+
+   systemctl --user stop llm-companion
+   podman volume import llm-open-webui-data ~/llm-companion-backups/llm-open-webui-data-<timestamp>.tar
+   systemctl --user start llm-companion
+
+Image versions are pinned in ``kube/stack.yml.j2``. Podman pulls missing
+images when the pod starts; pulling them before the playbook run keeps that
+start within the unit's 300 s start timeout:
+
+.. code-block:: bash
+
    podman pull docker.io/library/caddy:2.11.9
    podman pull ghcr.io/open-webui/open-webui:v0.13.5
    podman pull ghcr.io/open-webui/open-terminal:0.18.6-slim
    podman pull docker.io/searxng/searxng:2026.10.7-6671d89be
-   systemctl --user restart llm-companion
 
 ``AutoUpdate=registry`` in ``kube/llm-companion.kube`` also enables automatic updates via:
 
