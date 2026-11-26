@@ -493,7 +493,7 @@ spec:
 
     # ── Caddy ────────────────────────────────────────────────────────────────
     - name: caddy # NOSONAR — Podman pod, not Kubernetes; S6864/S6870/S6873/S6892/S6897 are inapplicable
-      image: docker.io/library/caddy:2.11.7
+      image: docker.io/library/caddy:2.11.9
       env:
         # API key for Ollama Bearer token auth — read from the Kubernetes Secret.
         - name: OLLAMA_API_KEY

@@ -46,7 +46,7 @@ executors:
       # Keep in sync with the caddy version pinned in the kube/stack*.yml
       # manifests, so `caddy validate` here reflects what actually
       # runs in production.
-      - image: caddy:2.11.7-alpine
+      - image: caddy:2.11.9-alpine
     resource_class: small
   docker-alpine:
     docker:
