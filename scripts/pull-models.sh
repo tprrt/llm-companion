@@ -352,6 +352,8 @@ for entry in "${MODELS[@]}"; do
             "$name" "$model_tag" "$size" "$label" "${PULL_USES[$model_tag]}"
     else
         reason=$(get_skip_reason "$arch" "$accel" "$min_ram" "$min_vram")
+        # Fits the hardware, but another model won each of its categories.
+        [[ -n "$reason" ]] || reason="fits; a higher-ranked model was picked (--all pulls it)"
         printf "  %-22s %-28s %-10s ${CYAN}%-6s${NC} %s\n" \
             "$name" "$model_tag" "$size" "skip" "$reason"
     fi
