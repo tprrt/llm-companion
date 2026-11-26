@@ -39,7 +39,7 @@ executors:
     resource_class: small
   docker-hadolint:
     docker:
-      - image: hadolint/hadolint:v2.12.0-alpine
+      - image: hadolint/hadolint:v2.15.1-alpine
     resource_class: small
   docker-caddy:
     docker:
