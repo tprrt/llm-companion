@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Container images pinned in the stack template",
+      "managerFilePatterns": ["/^kube/stack\\.yml\\.j2$/"],
+      "matchStrings": [
+        "image:\\s+(?<depName>[a-z0-9.-]+/[a-z0-9._/-]+):(?<currentValue>[A-Za-z0-9._-]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Image pull examples in the README, kept on the pinned versions",
+      "managerFilePatterns": ["/^README\\.rst$/"],
+      "matchStrings": [
+        "podman pull (?<depName>[a-z0-9.-]+/[a-z0-9._/-]+):(?<currentValue>[A-Za-z0-9._-]+)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "SearXNG tags are <date>-<commit>; compare the date part only",
+      "matchPackageNames": ["docker.io/searxng/searxng"],
+      "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)-[0-9a-f]+$"
+    },
+    {
+      "description": "CI validates the Caddyfile with the Caddy version the pod runs",
+      "matchPackageNames": ["caddy", "docker.io/library/caddy"],
+      "groupName": "caddy"
+    },
+    {
+      "description": "One PR per component across the template, the Dockerfile and the README",
+      "matchPackageNames": ["ghcr.io/open-webui/open-webui"],
+      "groupName": "open-webui"
+    },
+    {
+      "matchPackageNames": ["docker.io/ollama/ollama"],
+      "groupName": "ollama"
+    }
+  ]
+}
