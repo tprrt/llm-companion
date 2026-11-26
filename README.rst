@@ -861,6 +861,7 @@ Updating the stack
    # Pull pinned images and replace the pod (bump version tags in kube/stack.yml first):
    podman pull docker.io/library/caddy:2.11.9
    podman pull ghcr.io/open-webui/open-webui:v0.13.5
+   podman pull ghcr.io/open-webui/open-terminal:0.18.6-slim
    podman pull docker.io/searxng/searxng:2026.10.7-6671d89be
    systemctl --user restart llm-companion
 
