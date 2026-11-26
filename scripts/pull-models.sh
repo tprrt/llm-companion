@@ -187,12 +187,12 @@ declare -a MODELS=(
     # 256K native context.
     "LFM3 1.7B|lfm3:1.7b|2|0|4096||any|cpu|general|Hybrid model for local agents; tools + thinking; ~1.1 GB"
 
-    # Open WebUI background-task model (see TASK_PRIORITY below).
-    "Qwen3 1.7B|qwen3:1.7b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|task|Open WebUI background tasks; ~1.4 GB"
-
     # ── Any-arch embedding model (≤ 1 GB RAM) ───────────────────────────────
-    # Required by Open WebUI for RAG / document search; always pull.
-    "Nomic Embed Text|nomic-embed-text|1|0|8192||any|cpu|embedding|Open WebUI RAG / document search embedding; ~274 MB"
+    # Required by Open WebUI for RAG / document search (RAG_EMBEDDING_MODEL in
+    # the stack manifests); always pull. 3,040 tok/s on the CPU above vs
+    # 2,292 for nomic-embed-text, 1.0 GB resident. 2K context, ample for Open
+    # WebUI's default ~1,000-character chunks.
+    "EmbeddingGemma 300M|embeddinggemma:300m|1|0|2048||any|cpu|embedding|Open WebUI RAG / document search embedding; ~620 MB"
 )
 
 # ── Category priority lists (best tag first) ──────────────────────────────────
@@ -206,13 +206,15 @@ VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "mini
 # shellcheck disable=SC2034
 GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:26b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "lfm3:1.7b" )
 # shellcheck disable=SC2034
-EMBEDDING_PRIORITY=(  "nomic-embed-text" )
+EMBEDDING_PRIORITY=(  "embeddinggemma:300m" )
 # TASK_MODEL (see stack.yml) needs a tiny model that is always created regardless
 # of hardware tier, independent of whichever model wins the categories above —
-# otherwise Open WebUI's title-generation / search-query background tasks 404
-# on hosts where the "best" general pick isn't qwen3:1.7b itself.
+# otherwise Open WebUI's title-generation / search-query background tasks 404.
+# With thinking disabled (TASK_MODEL_PARAMS), qwen3.5:0.8b wrote a clean
+# 6-word title in 9 tokens / 0.3 s; lfm3:1.7b needed 56 tokens and ignored the
+# length limit.
 # shellcheck disable=SC2034
-TASK_PRIORITY=(        "qwen3:1.7b" )
+TASK_PRIORITY=(        "qwen3.5:0.8b" )
 
 # ── Hardware compatibility ────────────────────────────────────────────────────
 # model_fits: returns 0 if the model can run on this hardware, 1 otherwise.

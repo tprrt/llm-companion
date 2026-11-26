@@ -273,26 +273,29 @@ Embedding — RAG / document search (Open WebUI)
      - Disk
      - Gate
      - Strength
-   * - ``nomic-embed-text-8k``
-     - ``nomic-embed-text``
-     - ~274 MB
+   * - ``embeddinggemma-300m-2k``
+     - ``embeddinggemma:300m``
+     - ~620 MB
      - any CPU, 1 GB RAM
-     - Open WebUI document upload and semantic search
+     - Open WebUI document upload and semantic search; 3,040 tok/s
 
 .. note::
 
-   ``nomic-embed-text`` is not a chat model — it converts text to vectors for
-   Open WebUI's RAG feature (document upload + semantic search). It runs silently
-   in the background and is pulled on any hardware.
+   ``embeddinggemma:300m`` is not a chat model — it converts text to vectors
+   for Open WebUI's RAG feature (document upload + semantic search). It is
+   pulled on any hardware and set as ``RAG_EMBEDDING_MODEL`` in the stack
+   manifests. Its 2K context fits Open
+   WebUI's default ~1,000-character chunks. Changing the embedding model
+   means re-indexing documents already in Open WebUI.
 
 .. note::
 
-   **Task model:** ``qwen3-1.7b-4k`` (``qwen3:1.7b``) is always created, on
-   every hardware tier, regardless of which model wins the general category
-   above. Open WebUI uses
-   it as ``TASK_MODEL`` for background jobs (chat title generation, web search
-   query rewriting) so those requests don't evict the main chat model from
-   memory.
+   **Task model:** ``qwen3.5-0.8b-4k`` (``qwen3.5:0.8b``) is always created, on
+   every hardware tier, regardless of which model wins the categories above.
+   Open WebUI uses it as ``TASK_MODEL`` for background jobs (chat titles, tags,
+   web search queries) so those requests don't evict the main chat model from
+   memory, with thinking disabled through ``TASK_MODEL_PARAMS``. Each task
+   takes about 2 s on the CPU above.
 
 .. note::
 
@@ -619,7 +622,7 @@ Hardware gate is based on total RAM minus a configurable reserve (default: 2 GB)
 
 On an 8 GB CPU host (2 GB reserved, 6 GB effective), selects:
 ``qwen3.5-4b-16k`` (coding), ``ministral-3-3b-16k`` (vision and general),
-``qwen3-1.7b-4k`` (task model, always pulled) and ``nomic-embed-text-8k``
+``qwen3.5-0.8b-4k`` (task model, always pulled) and ``embeddinggemma-300m-2k``
 (embedding). From 10 GB of RAM (8 GB effective), ``mimo-v2.6-9b-16k`` takes
 coding and ``gemma4-e4b-8k`` takes vision and general.
 
@@ -852,8 +855,8 @@ Then pull models with RAM auto-detection:
    ./scripts/pull-models.sh
 
 On a 4 GB device (2 GB effective after the default 2 GB reserve),
-``pull-models.sh`` pulls ``qwen3.5:0.8b`` (coding and vision), ``lfm3:1.7b``,
-``qwen3:1.7b`` and ``nomic-embed-text``; ``ministral-3:3b`` needs 5 GB
+``pull-models.sh`` pulls ``qwen3.5:0.8b`` (coding, vision and task model),
+``lfm3:1.7b`` (general) and ``embeddinggemma:300m``; ``ministral-3:3b`` needs 5 GB
 effective.
 Models above the hardware gate are automatically skipped.
 
