@@ -97,9 +97,7 @@ Directory layout
    │   ├── Modelfile.qwen3.8-27b
    │   ├── Modelfile.laguna-xs-2.1
    │   ├── Modelfile.gemma4-12b
-   │   ├── Modelfile.gemma4-31b
-   │   ├── Modelfile.qwen3.5-9b      # Thinking mode disabled for agentic use
-   │   └── Modelfile.qwen2.5-coder
+   │   └── Modelfile.gemma4-31b
    │
    └── scripts/
        ├── vm.sh                     # Manage QEMU/KVM VMs (local or remote)
@@ -115,9 +113,14 @@ Directory layout
 Model catalogue
 ---------------
 
-All models are Apache 2.0 licensed except Laguna XS 2.1 (OpenMDW-1.1, also
-permissive for commercial use). Sizes are actual Q4_K_M on-disk weight
-sizes (not counting KV cache, which scales with context length).
+Sizes are actual Q4_K_M on-disk weight sizes. CPU gates are the resident
+memory measured with Ollama 0.40.18 at each variant's context length (weights
+plus KV cache), rounded up; speeds are prompt / generation tokens per second
+on a Zen 5 laptop CPU (Ryzen AI 7 350, 8 cores) for a ~1.8K-token code prompt.
+
+Licenses differ per model: check each model's page on ollama.com before
+commercial use. MiMo-V2.6 is MIT, Laguna XS 2.1 is OpenMDW-1.1 and LFM3 uses
+the LFM Open License v1.0.
 
 ``pull-models.sh`` auto-detects your architecture, GPU, and available RAM, then
 selects the **best fitting model per category** (coding, vision, general, embedding).
@@ -149,21 +152,21 @@ Coding — agentic tool use, multi-file edits
      - ~9 GB
      - GPU ≥ 14 GB VRAM
      - Reliable tool-call format; mid-GPU tier
-   * - ``qwen2.5-coder-7b-16k``
-     - ``qwen2.5-coder:7b``
-     - ~4.5 GB
-     - x86_64 CPU, 6 GB RAM
-     - Most reliable tool-call format; fast default at 6 GB
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
+   * - ``mimo-v2.6-9b-16k``
+     - ``mimo-v2.6:9b``
      - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality at 8 GB; CPU speed unverified (see note)
-   * - ``qwen2.5-coder-1.5b-4k``
-     - ``qwen2.5-coder:1.5b``
+     - any CPU, 8 GB RAM
+     - Code + agent fine-tune of Qwen3.5-9B; tools + vision; 71 / 6.7 tok/s
+   * - ``qwen3.5-4b-16k``
+     - ``qwen3.5:4b``
+     - ~3.3 GB
+     - any CPU, 5 GB RAM
+     - Tools + vision; 121 / 11.8 tok/s
+   * - ``qwen3.5-0.8b-4k``
+     - ``qwen3.5:0.8b``
      - ~1.3 GB
      - any CPU, 2 GB RAM
-     - Best code + tool-call at sub-2 GB (ARM64)
+     - Tools + vision on constrained devices; 484 / 31.7 tok/s
 
 Vision — image / schematic input, multilingual
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,23 +192,18 @@ Vision — image / schematic input, multilingual
    * - ``gemma4-e4b-8k``
      - ``gemma4:e4b``
      - ~6.6 GB
-     - any CPU, 9 GB RAM
-     - Native multimodal; Gemma 4 edge model; strong reasoning
+     - any CPU, 8 GB RAM
+     - Native multimodal; fastest 8 GB pick; 201 / 16.5 tok/s
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
-     - ~2 GB
-     - any CPU, 4 GB RAM
-     - Vision; 40+ languages; fast fallback
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
-     - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality; CPU speed unverified (see note)
-   * - ``moondream-1.8b-2k``
-     - ``moondream:1.8b``
-     - ~1.1 GB
+     - ~3 GB
+     - any CPU, 5 GB RAM
+     - Vision; 40+ languages; 182 / 14.3 tok/s
+   * - ``qwen3.5-0.8b-4k``
+     - ``qwen3.5:0.8b``
+     - ~1.3 GB
      - any CPU, 2 GB RAM
-     - Smallest vision model; image Q&A on constrained devices
+     - Smallest vision model with tools; 484 / 31.7 tok/s
 
 General — chat, reasoning, quick one-shot questions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,32 +231,21 @@ General — chat, reasoning, quick one-shot questions
      - ~7.7 GB
      - GPU ≥ 12 GB VRAM
      - General + vision on mid-range GPUs
-   * - ``deepseek-r1-8b-16k``
-     - ``deepseek-r1:8b``
-     - ~5 GB
-     - x86_64 CPU, 6 GB RAM
-     - R1-0528 Qwen3-8B distill; best CPU reasoning
    * - ``gemma4-e4b-8k``
      - ``gemma4:e4b``
      - ~6.6 GB
-     - any CPU, 9 GB RAM
-     - Native multimodal; Gemma 4 edge model; strong reasoning
+     - any CPU, 8 GB RAM
+     - Native multimodal; fastest 8 GB pick; 201 / 16.5 tok/s
    * - ``ministral-3-3b-16k``
      - ``ministral-3:3b``
-     - ~2 GB
-     - any CPU, 4 GB RAM
-     - Vision; 40+ languages; fast fallback
-   * - ``qwen3.5-9b-16k``
-     - ``qwen3.5:9b``
-     - ~6.6 GB
-     - x86_64 CPU, 8 GB RAM
-     - Native multimodal, highest quality; CPU speed unverified (see note)
-   * - ``qwen3-1.7b-4k``
-     - ``qwen3:1.7b``
-     - ~1.5 GB
+     - ~3 GB
+     - any CPU, 5 GB RAM
+     - Vision; 40+ languages; 182 / 14.3 tok/s
+   * - ``lfm3-1.7b-4k``
+     - ``lfm3:1.7b``
+     - ~1.1 GB
      - any CPU, 2 GB RAM
-     - Best reasoning at sub-2 GB; ``/no_think`` baked in; also always pulled
-       as the dedicated Open WebUI background-task model (see note)
+     - Hybrid model for local agents; 256K native context; 318 / 30.5 tok/s
 
 Embedding — RAG / document search (Open WebUI)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -285,36 +272,36 @@ Embedding — RAG / document search (Open WebUI)
 
 .. note::
 
-   **Task model:** ``qwen3-1.7b-4k`` is always created, on every hardware tier,
-   regardless of which model wins the general category above. Open WebUI uses
+   **Task model:** ``qwen3-1.7b-4k`` (``qwen3:1.7b``) is always created, on
+   every hardware tier, regardless of which model wins the general category
+   above. Open WebUI uses
    it as ``TASK_MODEL`` for background jobs (chat title generation, web search
    query rewriting) so those requests don't evict the main chat model from
    memory.
 
 .. note::
 
-   **Qwen3.5 9B speed:** its hybrid Gated-Delta-Network (linear attention)
-   layers were 5-6x slower in Ollama than in llama.cpp directly — see
-   `ollama/ollama#14579 <https://github.com/ollama/ollama/issues/14579>`_ and
-   `#14861 <https://github.com/ollama/ollama/issues/14861>`_. Ollama 0.31.2
-   fixed this on CUDA (measured within ~15% of llama.cpp); CPU-only speed has
-   not been re-measured. ``pull-models.sh`` therefore still ranks it last in
-   each CPU category (an explicit opt-in via ``--all`` or
-   ``ollama pull qwen3.5:9b`` rather than the automatic "best" pick) until
-   that is confirmed.
+   **Tool calls:** every CPU model above returns real tool calls. The
+   Qwen2.5-Coder models previously listed wrote them as plain JSON text, which
+   Ollama does not turn into ``tool_calls``, so OpenCode and other agents
+   never saw them.
 
 .. note::
 
    **Gemma 4 "effective" parameters:** ``gemma4:e4b``'s "4B" refers to
    *effective* (active) parameters, not on-disk weight size — the actual
    Q4_K_M download is 6.6 GB, larger than some models with bigger parameter
-   counts in their name. Its hardware gate (9 GB RAM) reflects the real size.
+   counts in their name. Its hardware gate (8 GB RAM) reflects the measured
+   memory use.
 
 .. note::
 
-   **Qwen3 thinking mode:** ``qwen3`` and ``qwen3.5`` variants bake in ``/no_think``
-   via a SYSTEM prompt where noted above, disabling chain-of-thought blocks for
-   faster, more predictable agentic responses.
+   **Thinking:** the Qwen3.5, MiMo and LFM3 models think by default, and on
+   Ollama 0.40.x they ignore a ``/no_think`` system prompt. On a CPU host this
+   can take longer than the answer itself. Disable it per request: Ollama's
+   ``"think": false``, or ``"reasoning_effort": "none"`` on the
+   OpenAI-compatible ``/ollama/v1`` endpoint. In Open WebUI, set it per model
+   under the model's advanced parameters.
 
 Switch models inside OpenCode at any time with ``/models``.
 
@@ -342,7 +329,7 @@ OpenCode can route to a cloud provider instead. Add them alongside the
      - Strong general + coding; available on most Copilot plans
    * - GitHub Copilot
      - ``github/o3-mini``
-     - Reasoning-focused; cloud equivalent of DeepSeek-R1
+     - Reasoning-focused; for harder reasoning than the CPU models handle
 
 See the `Configure OpenCode`_ section for the provider configuration.
 
@@ -615,12 +602,11 @@ Pull models
 / NVIDIA CUDA), and available RAM, then selects the **best fitting model per category**.
 Hardware gate is based on total RAM minus a configurable reserve (default: 2 GB).
 
-On an 8 GB x86_64 CPU host (2 GB reserved, 6 GB effective), selects:
-``qwen2.5-coder-7b-16k`` (coding), ``ministral-3-3b-16k`` (vision),
-``deepseek-r1-8b-16k`` (general), ``qwen3-1.7b-4k`` (task model, always pulled),
-``nomic-embed-text-8k`` (embedding). ``qwen3.5:9b`` would also fit at this tier
-but is ranked last per-category because its CPU speed in Ollama is unverified
-(see note above) — pull it explicitly with ``--all`` or by name if you want it anyway.
+On an 8 GB CPU host (2 GB reserved, 6 GB effective), selects:
+``qwen3.5-4b-16k`` (coding), ``ministral-3-3b-16k`` (vision and general),
+``qwen3-1.7b-4k`` (task model, always pulled) and ``nomic-embed-text-8k``
+(embedding). From 10 GB of RAM (8 GB effective), ``mimo-v2.6-9b-16k`` takes
+coding and ``gemma4-e4b-8k`` takes vision and general.
 
 Verify the proxy
 ^^^^^^^^^^^^^^^^
@@ -671,7 +657,7 @@ Configure OpenCode
 
    {
      "$schema": "https://opencode.ai/config.json",
-     "model": "ollama/qwen2.5-coder-7b-16k",
+     "model": "ollama/mimo-v2.6-9b-16k",
      "provider": {
        "ollama": {
          "npm": "@ai-sdk/openai-compatible",
@@ -683,10 +669,9 @@ Configure OpenCode
            }
          },
          "models": {
-           "qwen2.5-coder-7b-16k": { "name": "Qwen2.5-Coder 7B — reliable (16k)",        "tools": true },
-           "deepseek-r1-8b-16k":   { "name": "DeepSeek-R1 8B — CPU reasoning (16k)",     "tools": false },
-           "gemma4-e4b-8k":        { "name": "Gemma 4 4B — vision/general (8k)",          "tools": true },
-           "qwen3.5-9b-16k":       { "name": "Qwen3.5 9B — coding/vision/general (16k), see note", "tools": true }
+           "mimo-v2.6-9b-16k": { "name": "MiMo-V2.6 9B — coding (16k)",       "tools": true },
+           "qwen3.5-4b-16k":   { "name": "Qwen3.5 4B — coding (16k)",         "tools": true },
+           "gemma4-e4b-8k":    { "name": "Gemma 4 4B — vision/general (8k)",  "tools": true }
          }
        }
      }
@@ -843,8 +828,8 @@ Then pull models with RAM auto-detection:
    ./scripts/pull-models.sh
 
 On a 4 GB device (2 GB effective after the default 2 GB reserve),
-``pull-models.sh`` pulls ``qwen2.5-coder:1.5b``, ``qwen3:1.7b``,
-``moondream:1.8b`` and ``nomic-embed-text``; ``ministral-3:3b`` needs 4 GB
+``pull-models.sh`` pulls ``qwen3.5:0.8b`` (coding and vision), ``lfm3:1.7b``,
+``qwen3:1.7b`` and ``nomic-embed-text``; ``ministral-3:3b`` needs 5 GB
 effective.
 Models above the hardware gate are automatically skipped.
 
@@ -905,7 +890,7 @@ Useful commands
    podman exec llm-companion-ollama ollama list
 
    # Pull a model manually
-   podman exec -it llm-companion-ollama ollama pull qwen2.5-coder:7b
+   podman exec -it llm-companion-ollama ollama pull qwen3.5:4b
 
    # Reload Caddy config without restart (after updating kube/stack.yml ConfigMap)
    podman exec llm-companion-caddy caddy reload --config /etc/caddy/Caddyfile
@@ -1004,7 +989,7 @@ SSH into the VM and run the pull script directly:
    sudo firewall-cmd --list-ports        # should show 8080/tcp
    curl http://localhost:8080/           # verify Caddy responds
 
-**Qwen3.5 9B produces** ``<think>…</think>`` **blocks inside OpenCode**
+**Slow replies or long reasoning blocks from Qwen3.5, MiMo or LFM3**
 
-You are using the base ``qwen3.5:9b`` tag instead of ``qwen3.5-9b-16k``.
-Check the ``"model"`` field in ``opencode.json``.
+These models think by default. Disable thinking per request (see the
+**Thinking** note in the model catalogue).

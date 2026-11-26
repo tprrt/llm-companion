@@ -106,7 +106,7 @@ fi
 # accel       : cpu | rocm | cuda | any_gpu
 # min_ram_gb  : effective RAM gate for CPU models  (0 = no CPU RAM check)
 # min_vram_gb : VRAM gate for GPU models           (0 = no VRAM check)
-# categories  : comma-separated — coding, vision, general
+# categories  : comma-separated — coding, vision, general, embedding, task
 #               order within each category = quality rank (first = best)
 #
 # GPU models are listed first so that priority lists naturally prefer them
@@ -142,49 +142,43 @@ declare -a MODELS=(
     # needs a 24 GB card. See modelfiles/Modelfile.gemma4-31b.
     "Gemma 4 31B|gemma4:31b|0|24|16384||any|cuda|vision,general|Dense Gemma 4; thinking + vision; 24 GB tier; ~19 GB weights"
 
-    # ── x86_64 CPU models (6 GB+ RAM) ──────────────────────────────────────
-    # Highest-quality agentic model at the 8 GB CPU tier; native multimodal
-    # (vision built-in). Kept last in each priority list (not the default
-    # "best" pick) because its hybrid Gated-Delta-Network (linear attention)
-    # layers were 5-6x slower in Ollama than in llama.cpp direct (ollama/ollama
-    # #14579, #14861). Ollama 0.31.2 fixed this on CUDA (maintainers and
-    # reporters measured it within ~15% of llama.cpp); CPU-only speed has not
-    # been re-measured, so the ranking stays until it is. Pull explicitly with
-    # `--all` or by name if you want the quality over the smaller single-purpose
-    # models ranked above it.
-    "Qwen3.5 9B|qwen3.5:9b|8|0|16384|SYSTEM \"/no_think\"|x86_64|cpu|coding,vision,general|Native multimodal; better than Qwen3 8B across all tasks; CPU speed unverified; ~6.6 GB"
+    # ── CPU models (any architecture) ───────────────────────────────────────
+    # Gates are the resident memory measured with Ollama 0.40.18 at the listed
+    # context on a Zen 5 laptop CPU (Ryzen AI 7 350, 8 cores), rounded up.
+    # Speeds below are prompt / generation tokens per second on that machine,
+    # for a ~1.8K-token code prompt. All of these return real tool calls; the
+    # Qwen2.5-Coder models they replace wrote tool calls as plain JSON text,
+    # which Ollama does not turn into tool_calls, so agents never saw them.
+    #
+    # These models think by default and ignore a "/no_think" system prompt on
+    # Ollama 0.40.x; disable thinking per request instead (Ollama "think":
+    # false, or "reasoning_effort": "none" on /v1).
 
-    # Most reliable tool-call format compatibility — use if Qwen3 breaks tools.
-    "Qwen2.5-Coder 7B|qwen2.5-coder:7b|6|0|16384||x86_64|cpu|coding|Most reliable tool-call format; ~4.5 GB"
+    # Best CPU coding model: Xiaomi's code/agent fine-tune of Qwen3.5-9B, with
+    # vision. 71 / 6.7 tok/s, 7.6 GB at 16k.
+    "MiMo-V2.6 9B|mimo-v2.6:9b|8|0|16384||any|cpu|coding|Code + agent fine-tune of Qwen3.5-9B; tools + vision; ~6.6 GB"
 
-    # R1-0528 update distilled into Qwen3-8B backbone — stronger reasoning than
-    # the original 7B distill at nearly the same RAM cost.
-    "DeepSeek-R1 8B|deepseek-r1:8b|6|0|16384||x86_64|cpu|general|R1-0528 Qwen3-8B distill; stronger reasoning than original 7B; ~5 GB"
+    # Fastest model in the 8 GB class: 201 / 16.5 tok/s, 2.5x the 9B models,
+    # with tools and vision. 7.3 GB at 8k. The "4B" in "e4b" is *effective*
+    # parameters; the download is 6.6 GB.
+    "Gemma 4 4B|gemma4:e4b|8|0|8192||any|cpu|vision,general|Native multimodal; fastest 8 GB pick; ~6.6 GB weights"
 
-    # ── Any-arch CPU models (9 GB RAM) ──────────────────────────────────────
-    # Google Gemma 4 4B edge — native multimodal; clear upgrade over Gemma 3 4B.
-    # Actual Q4_K_M weight is 6.6 GB, not ~2.5 GB — the "4B" in "e4b" is
-    # *effective* (active) parameters, not on-disk weight size, so this needs
-    # more RAM than the 6 GB x86_64 tier above despite the smaller-sounding name.
-    "Gemma 4 4B|gemma4:e4b|9|0|8192||any|cpu|vision,general|Native multimodal; Gemma 4 edge model; strong reasoning; ~6.6 GB weights"
+    # Coding at 5-7 GB: 121 / 11.8 tok/s, 4.3 GB at 16k.
+    "Qwen3.5 4B|qwen3.5:4b|5|0|16384||any|cpu|coding|Tools + vision + thinking; ~3.3 GB"
 
-    # ── Any-arch CPU models (4 GB RAM) ─────────────────────────────────────
-    # Smallest vision-capable model; also useful as a fast general fallback.
-    "Ministral-3 3B|ministral-3:3b|4|0|16384||any|cpu|vision,general|Vision; 40+ languages; fast fallback; ~2 GB"
+    # Vision + general at 5-7 GB: 182 / 14.3 tok/s, 4.9 GB at 16k.
+    "Ministral-3 3B|ministral-3:3b|5|0|16384||any|cpu|vision,general|Vision; 40+ languages; fast; ~3 GB"
 
-    # ── Any-arch CPU models (≤ 2 GB RAM) ───────────────────────────────────
-    # Best code + tool-call model for constrained devices (ARM64, 2 GB+).
-    # ctx=4096: weights ~1 GB + KV cache ~0.3 GB = ~1.3 GB total.
-    # (ctx=16384 would add ~1.5 GB KV cache, exceeding the 2 GB effective RAM budget.)
-    "Qwen2.5-Coder 1.5B|qwen2.5-coder:1.5b|2|0|4096||any|cpu|coding|Best code + tool-call at sub-2 GB; ~1.3 GB at ctx=4k"
+    # ── CPU models (≤ 2 GB effective RAM) ───────────────────────────────────
+    # Coding + vision on constrained devices: 484 / 31.7 tok/s, 1.7 GB at 4k.
+    "Qwen3.5 0.8B|qwen3.5:0.8b|2|0|4096||any|cpu|coding,vision|Tools + vision; smallest catalogue model; ~1.3 GB"
 
-    # Best reasoning model for constrained devices; thinking disabled.
-    # ctx=4096: weights ~1.1 GB + KV cache ~0.44 GB = ~1.5 GB total.
-    # (ctx=16384 would add ~1.75 GB KV cache, pushing total to ~3.1 GB.)
-    "Qwen3 1.7B|qwen3:1.7b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|general|Best reasoning at sub-2 GB; thinking disabled; ~1.5 GB at ctx=4k"
+    # General chat on constrained devices: 318 / 30.5 tok/s, 1.3 GB at 4k,
+    # 256K native context.
+    "LFM3 1.7B|lfm3:1.7b|2|0|4096||any|cpu|general|Hybrid model for local agents; tools + thinking; ~1.1 GB"
 
-    # Smallest vision model; fills vision gap on ARM64 and ≤ 2 GB hosts.
-    "Moondream 2 1.8B|moondream:1.8b|2|0|2048||any|cpu|vision|Smallest vision model; image QA; ~1.1 GB"
+    # Open WebUI background-task model (see TASK_PRIORITY below).
+    "Qwen3 1.7B|qwen3:1.7b|2|0|4096|SYSTEM \"/no_think\"|any|cpu|task|Open WebUI background tasks; ~1.4 GB"
 
     # ── Any-arch embedding model (≤ 1 GB RAM) ───────────────────────────────
     # Required by Open WebUI for RAG / document search; always pull.
@@ -196,11 +190,11 @@ declare -a MODELS=(
 # hardware check. GPU models are listed before CPU models so a GPU host
 # naturally gets the best GPU model without any explicit GPU/CPU branching.
 # shellcheck disable=SC2034  # referenced via nameref (local -n) in find_best
-CODING_PRIORITY=(     "qwen3.8:27b" "laguna-xs-2.1" "qwen2.5-coder:14b" "qwen2.5-coder:7b" "qwen3.5:9b" "qwen2.5-coder:1.5b" )
+CODING_PRIORITY=(     "qwen3.8:27b" "laguna-xs-2.1" "qwen2.5-coder:14b" "mimo-v2.6:9b" "qwen3.5:4b" "qwen3.5:0.8b" )
 # shellcheck disable=SC2034
-VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:9b" "moondream:1.8b" )
+VISION_PRIORITY=(     "qwen3.8:27b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:0.8b" )
 # shellcheck disable=SC2034
-GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:12b" "deepseek-r1:8b" "gemma4:e4b" "ministral-3:3b" "qwen3.5:9b" "qwen3:1.7b" )
+GENERAL_PRIORITY=(    "qwen3.8:27b" "gemma4:12b" "gemma4:e4b" "ministral-3:3b" "lfm3:1.7b" )
 # shellcheck disable=SC2034
 EMBEDDING_PRIORITY=(  "nomic-embed-text" )
 # TASK_MODEL (see stack.yml) needs a tiny model that is always created regardless
@@ -393,4 +387,4 @@ echo ""
 info "Installed models:"
 podman exec "${CONTAINER_NAME}" ollama list
 echo ""
-info "Done. Use the variant tags (e.g. qwen3.5-9b-16k) in opencode.json."
+info "Done. Use the variant tags (e.g. mimo-v2.6-9b-16k) in opencode.json."
