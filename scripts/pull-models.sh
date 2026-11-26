@@ -180,7 +180,8 @@ declare -a MODELS=(
     # Gates are the resident memory measured with Ollama 0.40.18 at the listed
     # context on a Zen 5 laptop CPU (Ryzen AI 7 350, 8 cores), rounded up.
     # Speeds below are prompt / generation tokens per second on that machine,
-    # for a ~1.8K-token code prompt. All of these return real tool calls; the
+    # for a ~1.8K-token code prompt (scripts/bench-models.py re-measures them).
+    # All of these return real tool calls; the
     # Qwen2.5-Coder models they replace wrote tool calls as plain JSON text,
     # which Ollama does not turn into tool_calls, so agents never saw them.
     #

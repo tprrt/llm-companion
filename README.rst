@@ -119,6 +119,10 @@ memory measured with Ollama 0.40.18 at each variant's context length (weights
 plus KV cache), rounded up; speeds are prompt / generation tokens per second
 on a Zen 5 laptop CPU (Ryzen AI 7 350, 8 cores) for a ~1.8K-token code prompt.
 
+To re-measure on your own hardware, e.g. after an Ollama upgrade, run
+``scripts/bench-models.py`` against a pulled model; ``--help`` lists the
+options.
+
 Licenses differ per model: check each model's page on ollama.com before
 commercial use. MiMo-V2.6 is MIT, Flint is Apache 2.0, Laguna XS 2.1 is
 OpenMDW-1.1 and LFM3 uses the LFM Open License v1.0. GPU models are not

@@ -16,6 +16,9 @@ ansible/inventory/host_vars/
 # ── VM test artifacts ─────────────────────────────────────────────────────────
 vm-test/
 
+# ── Python bytecode (scripts/bench-models.py) ─────────────────────────────────
+__pycache__/
+
 # ── Editor and OS files ───────────────────────────────────────────────────────
 .DS_Store
 *.swp
