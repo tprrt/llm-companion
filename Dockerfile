@@ -20,7 +20,7 @@
 # -----------------------------------------------------------------------------
 # Stage: cpu — default target for x86-64 CPU-only hosts
 # -----------------------------------------------------------------------------
-FROM docker.io/ollama/ollama:0.40.1 AS cpu
+FROM docker.io/ollama/ollama:0.40.18 AS cpu
 
 # Running rootless with --userns=keep-id maps your host UID into the container.
 # We pre-create the models directory and hand ownership to UID 1000 (the
@@ -63,7 +63,7 @@ EXPOSE 11434
 # Run with:   add --device /dev/kfd --device /dev/dri and
 #             -e HSA_OVERRIDE_GFX_VERSION=<your gfx version>
 # -----------------------------------------------------------------------------
-FROM docker.io/ollama/ollama:0.40.1-rocm AS rocm
+FROM docker.io/ollama/ollama:0.40.18-rocm AS rocm
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -95,7 +95,7 @@ EXPOSE 11434
 # not anything in this stage.
 # Build with: podman build --target cuda -t ollama-cuda .
 # -----------------------------------------------------------------------------
-FROM docker.io/ollama/ollama:0.40.1 AS cuda
+FROM docker.io/ollama/ollama:0.40.18 AS cuda
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
