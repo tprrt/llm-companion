@@ -316,8 +316,9 @@ Embedding — RAG / document search (Open WebUI)
    Ollama 0.40.x they ignore a ``/no_think`` system prompt. On a CPU host this
    can take longer than the answer itself. Disable it per request: Ollama's
    ``"think": false``, or ``"reasoning_effort": "none"`` on the
-   OpenAI-compatible ``/ollama/v1`` endpoint. In Open WebUI, set it per model
-   under the model's advanced parameters.
+   OpenAI-compatible ``/ollama/v1`` endpoint. On CPU hosts, Open WebUI chats
+   default to no thinking (``llm_chat_thinking``, on by default with a GPU);
+   the per-chat toggle and per-model settings override it.
 
 Switch models inside OpenCode at any time with ``/models``.
 

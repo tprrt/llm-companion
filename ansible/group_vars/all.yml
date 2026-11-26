@@ -45,5 +45,10 @@ ollama_build_target: cpu
 # ROCm only: HSA_OVERRIDE_GFX_VERSION for GPUs ROCm does not support directly
 # (e.g. "11.0.0" for RDNA3). Find your GPU with: rocminfo | grep gfx
 ollama_hsa_override_gfx_version: ""
+
+# Whether Open WebUI chats let models think before answering by default.
+# Off on CPU hosts, where thinking can take longer than the answer; on with a
+# GPU. Per-model settings and the per-chat toggle override it either way.
+llm_chat_thinking: "{{ ollama_build_target != 'cpu' }}"
 # Image tag after build
 ollama_image_tag: "ollama-{{ ollama_build_target }}:latest"
